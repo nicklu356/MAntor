@@ -4,6 +4,7 @@
 // Mentors see their projects and the teams working on them (learners shown by anonymous name).
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Hero from "@/components/Hero";
 import { useUser } from "@/components/UserProvider";
 import {
   getProject,
@@ -134,20 +135,26 @@ function MentorHome({ currentUser, userName }) {
           <div className="spread">
             <div>
               <span className="badge badge-blue">{project.field}</span>
-              <h2 style={{ marginTop: 8 }}>{project.title}</h2>
+              <h2 style={{ marginTop: 8 }}>
+                <Link href={`/projects/${project.id}`} className="title-link">
+                  {project.title}
+                </Link>
+              </h2>
             </div>
-            <Link href={`/projects/${project.id}`} className="btn btn-ghost btn-small">
-              Project brief
-            </Link>
           </div>
           {teams.length === 0 ? (
             <p className="muted small">No team has joined yet.</p>
           ) : (
             <ul className="list-plain">
-              {teams.map((team) => (
+              {teams.map((team, index) => (
                 <li key={team.id}>
                   <div className="spread">
-                    <Link href={`/teams/${team.id}`}>{team.memberIds.map(userName).join(", ")}</Link>
+                    <div>
+                      <Link href={`/teams/${team.id}`}>
+                        <strong>Team {index + 1}</strong>
+                      </Link>
+                      <div className="muted small">{team.memberIds.map(userName).join(", ")}</div>
+                    </div>
                     <span className="row">
                       <span className="badge">
                         {team.done} of {team.total} tasks done
@@ -155,6 +162,9 @@ function MentorHome({ currentUser, userName }) {
                       <span className={team.hasFinal ? "badge badge-green" : "badge badge-amber"}>
                         {team.hasFinal ? "Final feedback given" : "Final feedback pending"}
                       </span>
+                      <Link href={`/teams/${team.id}`} className="btn btn-secondary btn-small">
+                        Open team →
+                      </Link>
                     </span>
                   </div>
                 </li>
@@ -169,10 +179,16 @@ function MentorHome({ currentUser, userName }) {
 
 export default function HomePage() {
   const { currentUser, isMentor, userName } = useUser();
-  if (!currentUser) return <p className="muted">Loading…</p>;
-  return isMentor ? (
-    <MentorHome currentUser={currentUser} userName={userName} />
-  ) : (
-    <LearnerHome currentUser={currentUser} />
+  return (
+    <>
+      <Hero />
+      {!currentUser ? (
+        <p className="muted">Loading…</p>
+      ) : isMentor ? (
+        <MentorHome currentUser={currentUser} userName={userName} />
+      ) : (
+        <LearnerHome currentUser={currentUser} />
+      )}
+    </>
   );
 }

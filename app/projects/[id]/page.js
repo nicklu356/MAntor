@@ -107,12 +107,20 @@ export default function ProjectDetailPage() {
                 <p className="muted small">No team has joined yet.</p>
               ) : (
                 <ul className="list-plain">
-                  {projectTeams.map((t) => (
+                  {projectTeams.map((t, index) => (
                     <li key={t.id}>
-                      <Link href={`/teams/${t.id}`}>
-                        {t.memberIds.map(userName).join(", ")}
-                      </Link>
-                      <span className="muted small"> · {t.status}</span>
+                      <div className="spread">
+                        <div>
+                          <Link href={`/teams/${t.id}`}>
+                            <strong>Team {index + 1}</strong>
+                          </Link>
+                          <span className="muted small"> · {t.status}</span>
+                          <div className="muted small">{t.memberIds.map(userName).join(", ")}</div>
+                        </div>
+                        <Link href={`/teams/${t.id}`} className="btn btn-secondary btn-small">
+                          Open team →
+                        </Link>
+                      </div>
                     </li>
                   ))}
                 </ul>

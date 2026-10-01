@@ -3,13 +3,13 @@
 // Task board for one team: To do, In progress, Done.
 // Below the board: progress chart, AI personal analysis (learners) and the mentor's final feedback.
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import FinalFeedback from "@/components/FinalFeedback";
 import PersonalAnalysis from "@/components/PersonalAnalysis";
 import ProgressPanel from "@/components/ProgressPanel";
 import { useUser } from "@/components/UserProvider";
-import { getProject, getTasks, getTeam, updateTask } from "@/lib/db";
+import { getProject, getTasks, getTeam, leaveTeam, updateTask } from "@/lib/db";
 
 const COLUMNS = [
   { status: "todo", label: "To do" },
@@ -20,10 +20,14 @@ const ORDER = COLUMNS.map((c) => c.status);
 
 export default function TeamPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { currentUser, isMentor, userName } = useUser();
   const [team, setTeam] = useState(undefined);
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
 
   const loadTasks = useCallback(() => getTasks(id).then(setTasks), [id]);
 
@@ -53,12 +57,35 @@ export default function TeamPage() {
     loadTasks();
   }
 
+  async function handleLeave() {
+    setLeaving(true);
+    setLeaveError("");
+    try {
+      await leaveTeam(team.id, currentUser.id);
+      router.push("/");
+    } catch (e) {
+      setLeaveError(e.message || "Could not leave the team");
+      setLeaving(false);
+    }
+  }
+
   if (team === undefined) return <p className="muted">Loading…</p>;
   if (team === null) return <p>Team not found.</p>;
+  if (team.status === "disbanded") {
+    return (
+      <div>
+        <Link href="/" className="back">
+          ← Home
+        </Link>
+        <p className="card muted">This team was disbanded because everyone left.</p>
+      </div>
+    );
+  }
 
   const isMember = Boolean(currentUser && !isMentor && team.memberIds.includes(currentUser.id));
   const isProjectMentor = Boolean(isMentor && project && project.mentorId === currentUser.id);
   const doneCount = tasks.filter((t) => t.status === "done").length;
+  const canLeave = isMember && team.status === "active";
 
   return (
     <div>
@@ -75,10 +102,37 @@ export default function TeamPage() {
             {team.status}
           </p>
         </div>
-        <Link href={`/projects/${team.projectId}`} className="btn btn-ghost">
-          Project brief
-        </Link>
+        <div className="row">
+          {canLeave && !confirmLeave && (
+            <button className="btn btn-danger" onClick={() => setConfirmLeave(true)}>
+              Leave team
+            </button>
+          )}
+          <Link href={`/projects/${team.projectId}`} className="btn btn-ghost">
+            Project brief
+          </Link>
+        </div>
       </div>
+
+      {canLeave && confirmLeave && (
+        <div className="card stack" style={{ marginBottom: 20 }}>
+          <strong>Leave this team?</strong>
+          <p className="muted small">
+            You will lose access to this team&apos;s board and your personal analysis. Work you already
+            submitted and your recorded contributions stay with the team. You can join the project again
+            later, but you may be placed in a different team.
+          </p>
+          {leaveError && <p className="error">{leaveError}</p>}
+          <div className="row">
+            <button className="btn btn-danger-solid" onClick={handleLeave} disabled={leaving}>
+              {leaving ? "Leaving…" : "Yes, leave team"}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setConfirmLeave(false)} disabled={leaving}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {isProjectMentor && (
         <p className="card muted">

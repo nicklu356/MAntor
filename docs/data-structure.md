@@ -113,10 +113,11 @@ users (learners and mentors)
 | `id` | string | Team id | `"team_001"` |
 | `projectId` | string | Project the team works on (links to `projects`) | `"project_001"` |
 | `memberIds` | array of string | Members (links to `users`) | `["user_001", "user_002"]` |
-| `status` | string | `"active"` or `"completed"` | `"active"` |
+| `status` | string | `"active"`, `"completed"` or `"disbanded"` (everyone left) | `"active"` |
 | `createdAt` | string | Created time | |
 
 * ✅ `status` becomes `"completed"` when the mentor gives final feedback and every task is done
+* 🚪 A learner can leave an active team: they are removed from `memberIds` and from task `assigneeIds`, while submissions and contributions stay. If nobody is left, `status` becomes `"disbanded"` (hidden from mentors, ignored when joining). A `"completed"` team cannot be left
 * 🤝 Joining a project: the learner goes into an active team that still has space, otherwise a new team is created
 
 ---

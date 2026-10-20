@@ -158,3 +158,62 @@ test("format helpers", () => {
   assert.equal(average([4, 2, null]), 3);
   assert.equal(average([]), null);
 });
+
+test("mentor attention: help first, then low scores, then teams ready for final feedback", async () => {
+  const { buildAttention } = await import("../lib/attention.js");
+  const items = buildAttention([
+    {
+      id: "a",
+      status: "active",
+      project: { title: "P" },
+      tasks: [
+        { id: "t1", title: "One", status: "in_progress", helpRequest: { userId: "u1", at: "2026-01-03", resolvedAt: null } },
+        { id: "t2", title: "Two", status: "todo" },
+      ],
+      feedback: [{ taskId: "t2", kind: "task", createdAt: "2026-01-02", scores: [{ criteriaId: "c1", score: 2 }] }],
+    },
+    {
+      id: "b",
+      status: "active",
+      project: { title: "Q" },
+      tasks: [{ id: "t3", title: "Three", status: "done", helpRequest: { userId: "u2", at: "2026-01-01", resolvedAt: "2026-01-02" } }],
+      feedback: [],
+    },
+  ]);
+  assert.deepEqual(
+    items.map((i) => i.kind),
+    ["help", "struggling", "final"]
+  );
+});
+
+test("achievements are earned from existing records", async () => {
+  const { computeAchievements } = await import("../lib/achievements.js");
+  const project = { field: "Data Analysis", criteria: [{ id: "c1", name: "Clean", description: "d" }] };
+  const entry = {
+    team: { status: "completed" },
+    project,
+    tasks: [{ id: "t1", criteriaIds: ["c1"], submission: { submittedBy: "u1" } }],
+    feedback: [
+      { taskId: "t1", kind: "task", scores: [{ criteriaId: "c1", score: 3 }] },
+      { taskId: "t1", kind: "task", scores: [{ criteriaId: "c1", score: 5 }] },
+      { taskId: null, kind: "final", scores: [{ criteriaId: "c1", score: 4 }] },
+    ],
+    contributions: [{ userId: "u1", hoursSpent: 4, kudos: [{ userId: "u2" }] }],
+    comments: [],
+  };
+  const earned = computeAchievements("u1", [entry]).filter((a) => a.earned).map((a) => a.id);
+  assert.deepEqual(earned, ["first-step", "feedback-loop", "appreciated", "finisher", "mentor-approved"]);
+});
+
+test("notifications include kudos and help requests", () => {
+  const team = {
+    id: "team",
+    project: { title: "P" },
+    tasks: [{ id: "t1", title: "Task", helpRequest: { userId: "u1", note: "stuck", at: "2026-01-02", resolvedAt: null } }],
+    contributions: [{ id: "c1", taskId: "t1", userId: "u1", description: "d", kudos: [{ userId: "u2", at: "2026-01-03" }] }],
+  };
+  const learner = buildNotifications({ viewer: { id: "u1", role: "learner" }, teams: [team], userName: (id) => id });
+  assert.ok(learner.some((i) => i.id.startsWith("kudos:")));
+  const mentor = buildNotifications({ viewer: { id: "m1", role: "mentor" }, teams: [team], userName: (id) => id });
+  assert.ok(mentor.some((i) => i.id.startsWith("help:")));
+});

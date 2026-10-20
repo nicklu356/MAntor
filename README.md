@@ -15,8 +15,8 @@ Students and career changers need hands-on experience, but online learning rarel
 
 | Feature | Status |
 |---------|--------|
-| Career assessment (6 questions, scored in the app) | ✅ Built (AI writes the "why" text) |
-| Project matching from the assessment result | ✅ Built (rule based: same field first) |
+| Career assessment: 32 activities on Holland's RIASEC model, 8 career fields, % fit, consistency checks, interest profile | ✅ Built (AI writes the "why" text) |
+| Project matching from the assessment result | ✅ Built (projects ranked by % fit) |
 | Browse and choose projects | ✅ Built |
 | Join a project (creates or fills a team) | ✅ Built |
 | Task board (To do, In progress, Done) | ✅ Built |
@@ -30,6 +30,8 @@ Students and career changers need hands-on experience, but online learning rarel
 | Identity reveal: a mentor asks to connect, the learner decides whether to share their name | ✅ Built |
 | Learner portfolio: projects, contributions, scores, mentor quotes; shareable and printable as PDF | ✅ Built |
 | Notifications bell (comments, submissions, feedback, connection requests) | ✅ Built |
+| "Ask the mentor" help requests, and a mentor "Needs your attention" queue | ✅ Built |
+| Kudos between teammates, and achievements on the portfolio | ✅ Built |
 | Drag-and-drop task board, project search and filters, toasts, 404 and error pages | ✅ Built |
 | Unit tests (`npm test`) and GitHub Actions CI (test + build) | ✅ Built |
 | Login | 🎭 Simulated ("Viewing as" switch in the header) |
@@ -148,8 +150,8 @@ If you already loaded demo data before this update, open `/setup` and click **Lo
 
 Before a pitch, open `/setup` and click **Reset demo data** so the demo starts clean. Check the header badge says **AI: Live** (real key set).
 
-1. **Assessment:** as *Mia Chen*, open **Assessment**, answer the 6 questions, see the result and the "why" text
-2. **Projects:** matching projects appear first with a *Matches your result* badge
+1. **Assessment:** as *Mia Chen*, open **Assessment**: her saved result shows (best match, every field's % fit, interest profile). Click **Retake** and rate the 32 activities (8 per page; progress is saved if you leave)
+2. **Projects:** projects are ranked by % fit, with a *Best match* badge
 3. **Team board:** open *Redesign a banking app onboarding flow* (Mia's team, in progress with Liam)
 4. **Task + feedback:** open *Interview 3 users*. The page already shows an **Example** AI review (score 3). Expand the submission with more detail, click **Update submission**, then **Get new feedback**: the score changes (for example **+1**)
 5. **Progress:** go back to the team page; the **Progress** panel shows the score history (3 → 4) per criterion
@@ -193,6 +195,8 @@ components/
   FinalFeedback.js                 Mentor final feedback (form for the mentor, display for others)
   CommentThread.js                 Team discussion under a task
   CoachPanel.js                    "Ask the AI coach" chat
+  CareerResult.js                  Assessment result: matches, field details, interest profile
+  HelpRequest.js                   "Ask the mentor" on a task
   ProjectForm.js                   Mentor's project editor (criteria, tasks, AI draft)
   TeamMembers.js                   Team panel; mentors send "Interested in their work" requests
   ConnectionRequests.js            Learner accepts or declines mentor requests
@@ -201,10 +205,12 @@ components/
 lib/
   db.js                            Every read and write (Firebase or demo mode)
   seed.js                          Demo users, projects, team, tasks, example feedback, comments
-  assessment.js                    Assessment questions and scoring
+  assessment.js                    Assessment activities, 8 career fields (RIASEC), scoring and checks
   courses.js                       Curated course list (the AI can only pick from here)
   progress.js                      Builds score history per criterion
   notifications.js                 Builds the bell's list from existing records
+  attention.js                     Mentor's "Needs your attention" list
+  achievements.js                  Achievements shown on the portfolio
   projectDraft.js                  Cleans the project form; normalises the AI draft
   format.js                        timeAgo and other display helpers
   server/ai.js                     Shared AI helpers: fallback checks, rate limit, size limits
@@ -222,7 +228,7 @@ docs/
 * **Projects, criteria, demo learners:** `lib/seed.js` (then reset demo data, or reload it into Firebase at `/setup`)
 * **How the AI gives feedback:** `SYSTEM_PROMPT` in `app/api/feedback/route.js` (the coach and project draft have their own prompts in `app/api/coach` and `app/api/project-draft`)
 * **AI model:** `ANTHROPIC_MODEL` in `.env.local`. All AI calls go through `askJson` / `askText` in `lib/server/ai.js` (structured outputs, so answers always match the expected JSON)
-* **Assessment questions and results:** `lib/assessment.js` (field names must match the project `field` values)
+* **Assessment activities, fields and scoring:** `lib/assessment.js`. Each activity has a RIASEC type and (usually) a field; each field has a RIASEC profile and the text shown on the result page. Career field names live in `lib/config.js` and must match the project `field` values. `npm test` checks every field still gets recommended for a matching persona
 * **Course suggestions:** `lib/courses.js`. The AI can only choose from this list. Check the links before a pitch
 * **Input limits:** `lib/config.js` (submission, comment and feedback length)
 * **AI rate limit:** `rateLimit()` in `lib/server/ai.js` (20 requests per 10 minutes per visitor, only when a key is set)

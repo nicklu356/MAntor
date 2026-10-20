@@ -50,7 +50,11 @@ export default function Header() {
           ))}
         </nav>
         <div className="header-right">
-          {isMentor && <span className="badge badge-blue">Mentor view · learner names hidden</span>}
+          {isMentor && (
+            <span className="badge badge-blue" title="Learners appear by anonymous name until they choose to share it">
+              Mentor view
+            </span>
+          )}
           {ai !== null && (
             <span className={ai ? "badge badge-green" : "badge badge-amber"}>
               {ai ? "AI: Live" : "AI: Simulated"}
@@ -61,7 +65,7 @@ export default function Header() {
           </span>
           <NotificationBell />
           <label className="user-switch">
-            <span className="muted small">Viewing as</span>
+            <span className="muted small viewing-as">Viewing as</span>
             <select
               value={currentUser?.id || ""}
               onChange={(e) => switchUser(e.target.value)}

@@ -15,7 +15,9 @@ import {
   getTeamsForProject,
   getTeamsForUser,
 } from "@/lib/db";
+import { buildAttention } from "@/lib/attention";
 import { APP_TAGLINE } from "@/lib/config";
+import { timeAgo } from "@/lib/format";
 
 function LearnerHome({ currentUser }) {
   const [teams, setTeams] = useState(null);
@@ -139,6 +141,9 @@ function MentorHome({ currentUser, userName }) {
               const [tasks, feedback] = await Promise.all([getTasks(team.id), getTeamFeedback(team.id)]);
               return {
                 ...team,
+                project,
+                tasks,
+                feedback,
                 done: tasks.filter((t) => t.status === "done").length,
                 total: tasks.length,
                 hasFinal: feedback.some((f) => f.kind === "final"),
@@ -153,10 +158,11 @@ function MentorHome({ currentUser, userName }) {
   }, [currentUser.id]);
 
   const allTeams = (rows || []).flatMap((r) => r.teams);
+  const attention = buildAttention(allTeams);
   const stats = [
     { label: "Projects", value: rows?.length ?? "–" },
     { label: "Active teams", value: allTeams.filter((t) => t.status === "active").length },
-    { label: "Ready for final feedback", value: allTeams.filter((t) => t.total && t.done === t.total && !t.hasFinal).length },
+    { label: "Ready for final feedback", value: allTeams.filter((t) => t.status === "active" && t.total && t.done === t.total && !t.hasFinal).length },
     { label: "Completed", value: allTeams.filter((t) => t.status === "completed").length },
   ];
 
@@ -187,6 +193,47 @@ function MentorHome({ currentUser, userName }) {
       )}
 
       {rows === null && <p className="muted">Loading…</p>}
+      {rows && (
+        <section className="card">
+          <div className="spread">
+            <h2>Needs your attention</h2>
+            <span className={attention.length ? "badge badge-amber" : "badge badge-green"}>
+              {attention.length ? `${attention.length} item${attention.length > 1 ? "s" : ""}` : "All clear"}
+            </span>
+          </div>
+          {attention.length === 0 ? (
+            <p className="muted small">
+              No help requests, no struggling tasks, no teams waiting for final feedback. AI feedback is covering the rest.
+            </p>
+          ) : (
+            <ul className="list-plain">
+              {attention.slice(0, 8).map((item) => (
+                <li key={item.id}>
+                  <div className="spread">
+                    <div>
+                      <span className={item.kind === "help" ? "badge badge-amber" : "badge"}>
+                        {item.kind === "help" ? "Help request" : item.kind === "struggling" ? "Low AI score" : "Ready for final feedback"}
+                      </span>{" "}
+                      <Link href={item.href}>
+                        <strong>
+                          {item.kind === "final"
+                            ? `${item.project?.title}: every task is done`
+                            : item.kind === "help"
+                              ? `${userName(item.userId)} on “${item.task.title}”`
+                              : `“${item.task.title}” scored ${item.lowest}/5 in its latest review`}
+                        </strong>
+                      </Link>
+                      {item.note && <div className="muted small clamp-2">{item.note}</div>}
+                    </div>
+                    <span className="muted small">{timeAgo(item.at)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {rows?.length === 0 && (
         <div className="card">
           <p className="muted">You have no projects yet. Turn a situation from your work into one in a few minutes.</p>

@@ -4,6 +4,7 @@
 // Mentors see their projects and the teams working on them (learners shown by anonymous name).
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ConnectionRequests from "@/components/ConnectionRequests";
 import Hero from "@/components/Hero";
 import { useUser } from "@/components/UserProvider";
 import {
@@ -22,7 +23,15 @@ function LearnerHome({ currentUser }) {
   useEffect(() => {
     getTeamsForUser(currentUser.id).then(async (list) => {
       const withProjects = await Promise.all(
-        list.map(async (team) => ({ ...team, project: await getProject(team.projectId) }))
+        list.map(async (team) => {
+          const [project, tasks] = await Promise.all([getProject(team.projectId), getTasks(team.id)]);
+          // "Up next": my task in progress first, then any open task nobody took yet.
+          const next =
+            tasks.find((t) => t.status === "in_progress" && t.assigneeIds.includes(currentUser.id)) ||
+            tasks.find((t) => t.status !== "done" && t.assigneeIds.includes(currentUser.id)) ||
+            tasks.find((t) => t.status === "todo" && t.assigneeIds.length === 0);
+          return { ...team, project, done: tasks.filter((t) => t.status === "done").length, total: tasks.length, next };
+        })
       );
       setTeams(withProjects);
     });
@@ -34,6 +43,8 @@ function LearnerHome({ currentUser }) {
         <h1>Hi {currentUser.name.split(" ")[0]}</h1>
         <p className="muted">{APP_TAGLINE}</p>
       </div>
+
+      <ConnectionRequests />
 
       <section className="card hero">
         <div className="spread">
@@ -78,11 +89,22 @@ function LearnerHome({ currentUser }) {
         <div className="grid">
           {teams?.map((team) => (
             <Link key={team.id} href={`/teams/${team.id}`} className="card project-card">
-              <span className="badge badge-blue">{team.project?.field}</span>
+              <div className="row">
+                <span className="badge badge-blue">{team.project?.field}</span>
+                {team.status === "completed" && <span className="badge badge-green">Completed</span>}
+              </div>
               <h3>{team.project?.title}</h3>
+              <div className="bar" aria-label={`${team.done} of ${team.total} tasks done`}>
+                <div className="bar-fill" style={{ width: `${team.total ? (team.done / team.total) * 100 : 0}%` }} />
+              </div>
               <span className="muted small">
-                {team.memberIds.length} of {team.project?.teamSize} members · {team.status}
+                {team.done} of {team.total} tasks done · {team.memberIds.length} of {team.project?.teamSize} members
               </span>
+              {team.next && team.status === "active" && (
+                <span className="small">
+                  <strong>Up next:</strong> {team.next.title}
+                </span>
+              )}
             </Link>
           ))}
         </div>
@@ -117,18 +139,49 @@ function MentorHome({ currentUser, userName }) {
     });
   }, [currentUser.id]);
 
+  const allTeams = (rows || []).flatMap((r) => r.teams);
+  const stats = [
+    { label: "Projects", value: rows?.length ?? "–" },
+    { label: "Active teams", value: allTeams.filter((t) => t.status === "active").length },
+    { label: "Ready for final feedback", value: allTeams.filter((t) => t.total && t.done === t.total && !t.hasFinal).length },
+    { label: "Completed", value: allTeams.filter((t) => t.status === "completed").length },
+  ];
+
   return (
     <div className="stack">
-      <div>
-        <h1>Hi {currentUser.name.split(" ")[0]}</h1>
-        <p className="muted">
-          You are viewing as a mentor at {currentUser.company}. Learners appear by anonymous name only, so you
-          judge the work, not the person.
-        </p>
+      <div className="spread">
+        <div>
+          <h1>Hi {currentUser.name.split(" ")[0]}</h1>
+          <p className="muted">
+            You are viewing as a mentor at {currentUser.company}. Learners appear by anonymous name only, so you
+            judge the work, not the person.
+          </p>
+        </div>
+        <Link href="/projects/new" className="btn">
+          + New project
+        </Link>
       </div>
 
+      {rows && (
+        <div className="stats">
+          {stats.map((s) => (
+            <div key={s.label} className="stat">
+              <div className="stat-value">{s.value}</div>
+              <div className="muted small">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {rows === null && <p className="muted">Loading…</p>}
-      {rows?.length === 0 && <div className="card muted">You have no projects yet.</div>}
+      {rows?.length === 0 && (
+        <div className="card">
+          <p className="muted">You have no projects yet. Turn a situation from your work into one in a few minutes.</p>
+          <Link href="/projects/new" className="btn">
+            Create your first project
+          </Link>
+        </div>
+      )}
 
       {rows?.map(({ project, teams }) => (
         <section key={project.id} className="card">

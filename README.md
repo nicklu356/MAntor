@@ -1,4 +1,4 @@
-# Project-Driven Learning
+# MAntor
 
 > Learn by doing real-world projects, guided by industry mentors.
 
@@ -25,12 +25,29 @@ Students and career changers need hands-on experience, but online learning rarel
 | Progress panel (score history per criterion) | ✅ Built |
 | AI personal analysis + course suggestions (curated list) | ✅ Built (Claude API) |
 | Mentor view: anonymous learners, guidance, final feedback | ✅ Built |
+| Mentors create and edit their own projects, with an AI draft of criteria and tasks | ✅ Built (Claude API) |
+| AI coach on every task (hints and questions, never the finished work) | ✅ Built (Claude API) |
+| Identity reveal: a mentor asks to connect, the learner decides whether to share their name | ✅ Built |
+| Learner portfolio: projects, contributions, scores, mentor quotes; shareable and printable as PDF | ✅ Built |
+| Notifications bell (comments, submissions, feedback, connection requests) | ✅ Built |
+| Drag-and-drop task board, project search and filters, toasts, 404 and error pages | ✅ Built |
+| Unit tests (`npm test`) and GitHub Actions CI (test + build) | ✅ Built |
 | Login | 🎭 Simulated ("Viewing as" switch in the header) |
-| Mentors creating their own projects | 🎨 Not built (projects come from `lib/seed.js`) |
 
 ### 🔌 What happens without an API key
 
-The app **never breaks without a key**. With no `ANTHROPIC_API_KEY` (or if the AI service fails), feedback, the assessment explanation and the personal analysis fall back to a simulated version, clearly labelled **Simulated** in the app. The header badge shows **AI: Live** or **AI: Simulated** so you can see which mode you are in.
+The app **never breaks without a key**. With no `ANTHROPIC_API_KEY` (or if the AI service fails), feedback, the assessment explanation, the personal analysis, the AI coach and the project draft fall back to a simulated version, clearly labelled **Simulated** in the app. The header badge shows **AI: Live** or **AI: Simulated** so you can see which mode you are in.
+
+---
+
+## 🧪 Tests
+
+```bash
+npm test         # unit tests for the logic in lib/
+npm run build    # production build
+```
+
+GitHub Actions runs both on every push to `main` and on every pull request.
 
 ---
 
@@ -137,8 +154,12 @@ Before a pitch, open `/setup` and click **Reset demo data** so the demo starts c
 4. **Task + feedback:** open *Interview 3 users*. The page already shows an **Example** AI review (score 3). Expand the submission with more detail, click **Update submission**, then **Get new feedback**: the score changes (for example **+1**)
 5. **Progress:** go back to the team page; the **Progress** panel shows the score history (3 → 4) per criterion
 6. **AI personal analysis:** click **Generate my analysis** to get strengths, next steps and suggested courses
-7. **Mentor view:** switch *Viewing as* to **Grace Walker (mentor)**. Learners now appear only as *Learner #A3F* / *Learner #B71* (in the dropdown too). Open the team, leave a comment, and give **final feedback**
-8. **Back to the learner:** switch to *Learner #A3F* (Mia) and open the team page: the mentor's final feedback is there
+7. **AI coach:** on the task page, click **Where should I start?** in *Ask the AI coach*. It gives hints, not answers
+8. **Mentor view:** switch *Viewing as* to **Grace Walker (mentor)**. Learners now appear only as *Learner #A3F* / *Learner #B71* (in the dropdown too). Open the team, leave a comment, and give **final feedback**
+9. **Interested in their work:** in the *Team* panel, click **Interested in their work** next to *Learner #A3F* and send the request
+10. **Back to the learner:** switch to *Learner #A3F* (Mia). Home shows the request: click **Share my name**. The bell shows the mentor's activity. Switch back to Grace: she now sees *Mia Chen*, but Liam stays *Learner #B71*
+11. **Mentor creates a project:** as Grace, click **New project**, write a title and scenario, then **Draft criteria and tasks with AI**, edit, and **Publish**
+12. **Portfolio:** switch to Liam and open **Portfolio**: a completed, mentor-reviewed data project with scores (3 → 5) and the mentor's quote. **Save as PDF** prints it
 
 Anonymous names: Mia = `Learner #A3F`, Liam = `Learner #B71`, Sofia = `Learner #C09`, Noah = `Learner #D52`.
 
@@ -150,12 +171,17 @@ app/
   assessment/page.js               Career assessment (6 questions)
   projects/page.js                 Browse projects
   projects/[id]/page.js            Project brief, mentor criteria, Join
+  projects/new/page.js             Mentor: publish a new project
+  projects/[id]/edit/page.js       Mentor: edit their project
+  portfolio/[id]/page.js           Learner portfolio (shareable, printable)
   teams/[id]/page.js               Task board, progress, personal analysis, mentor final feedback
   teams/[id]/tasks/[taskId]/page.js  Task: submission, contributions, AI feedback, discussion
   setup/page.js                    Load demo data into Firebase / reset demo mode
   api/feedback/route.js            AI task feedback (server, keeps the key secret)
   api/analysis/route.js            AI personal analysis + course picks
   api/assessment/route.js          AI "why this field fits you" text
+  api/coach/route.js               AI coach chat on a task (hints only)
+  api/project-draft/route.js       AI draft of criteria and tasks for a mentor's project
   api/status/route.js              Tells the header if AI is live or simulated
 components/
   Header.js                        Menu, AI/mode badges, "Viewing as" switch (learners and mentors)
@@ -166,14 +192,24 @@ components/
   PersonalAnalysis.js              AI personal analysis and course cards
   FinalFeedback.js                 Mentor final feedback (form for the mentor, display for others)
   CommentThread.js                 Team discussion under a task
+  CoachPanel.js                    "Ask the AI coach" chat
+  ProjectForm.js                   Mentor's project editor (criteria, tasks, AI draft)
+  TeamMembers.js                   Team panel; mentors send "Interested in their work" requests
+  ConnectionRequests.js            Learner accepts or declines mentor requests
+  NotificationBell.js              Bell in the header
+  Hero.js, Toast.js                Home banner; small confirmation messages
 lib/
   db.js                            Every read and write (Firebase or demo mode)
   seed.js                          Demo users, projects, team, tasks, example feedback, comments
   assessment.js                    Assessment questions and scoring
   courses.js                       Curated course list (the AI can only pick from here)
   progress.js                      Builds score history per criterion
+  notifications.js                 Builds the bell's list from existing records
+  projectDraft.js                  Cleans the project form; normalises the AI draft
+  format.js                        timeAgo and other display helpers
   server/ai.js                     Shared AI helpers: fallback checks, rate limit, size limits
   firebase.js, mockStore.js, config.js
+tests/                             Unit tests for lib/ (npm test)
 docs/
   execution-plan.md                Problem, user flow, design decisions, MVP
   data-structure.md                Firestore collections and fields
@@ -184,7 +220,8 @@ docs/
 * **App name:** `lib/config.js`
 * **Colours and fonts (to match Figma):** the variables at the top of `app/globals.css`
 * **Projects, criteria, demo learners:** `lib/seed.js` (then reset demo data, or reload it into Firebase at `/setup`)
-* **How the AI gives feedback:** `SYSTEM_PROMPT` in `app/api/feedback/route.js`
+* **How the AI gives feedback:** `SYSTEM_PROMPT` in `app/api/feedback/route.js` (the coach and project draft have their own prompts in `app/api/coach` and `app/api/project-draft`)
+* **AI model:** `ANTHROPIC_MODEL` in `.env.local`. All AI calls go through `askJson` / `askText` in `lib/server/ai.js` (structured outputs, so answers always match the expected JSON)
 * **Assessment questions and results:** `lib/assessment.js` (field names must match the project `field` values)
 * **Course suggestions:** `lib/courses.js`. The AI can only choose from this list. Check the links before a pitch
 * **Input limits:** `lib/config.js` (submission, comment and feedback length)

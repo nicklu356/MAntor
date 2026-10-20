@@ -5,9 +5,8 @@
 import { COURSES } from "@/lib/courses";
 import {
   DATA_RULE,
+  askJson,
   clip,
-  getClient,
-  getModel,
   hasAI,
   rateLimit,
   readJson,
@@ -20,30 +19,29 @@ Be encouraging but honest. Keep every item to one or two plain sentences.
 Recommend 2 or 3 courses, and ONLY choose ids from the course list provided.
 ${DATA_RULE}`;
 
-const ANALYSIS_TOOL = {
-  name: "give_analysis",
-  description: "Return a personal analysis for the learner.",
-  input_schema: {
-    type: "object",
-    properties: {
-      summary: { type: "string", description: "2 to 3 sentences about how the project went." },
-      strengths: { type: "array", items: { type: "string" }, description: "2 to 4 strengths." },
-      improvements: { type: "array", items: { type: "string" }, description: "2 to 4 things to improve." },
-      nextSteps: { type: "array", items: { type: "string" }, description: "2 to 3 concrete next steps." },
-      courses: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "A course id from the provided list." },
-            reason: { type: "string", description: "One sentence on why this course helps." },
-          },
-          required: ["id", "reason"],
+// Structured output: Claude must answer with exactly this JSON shape.
+const ANALYSIS_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", description: "2 to 3 sentences about how the project went." },
+    strengths: { type: "array", items: { type: "string" }, description: "2 to 4 strengths." },
+    improvements: { type: "array", items: { type: "string" }, description: "2 to 4 things to improve." },
+    nextSteps: { type: "array", items: { type: "string" }, description: "2 to 3 concrete next steps." },
+    courses: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "A course id from the provided list." },
+          reason: { type: "string", description: "One sentence on why this course helps." },
         },
+        required: ["id", "reason"],
+        additionalProperties: false,
       },
     },
-    required: ["summary", "strengths", "improvements", "nextSteps", "courses"],
   },
+  required: ["summary", "strengths", "improvements", "nextSteps", "courses"],
+  additionalProperties: false,
 };
 
 // null / missing stays null (Number(null) would wrongly become 0). Scores are kept between 1 and 5.
@@ -180,30 +178,21 @@ export async function POST(request) {
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   try {
-    const message = await getClient().messages.create({
-      model: getModel(),
-      max_tokens: 1500,
-      system: SYSTEM_PROMPT,
-      tools: [ANALYSIS_TOOL],
-      tool_choice: { type: "tool", name: ANALYSIS_TOOL.name },
-      messages: [{ role: "user", content: buildPrompt(input) }],
-    });
-    const toolUse = message.content.find((block) => block.type === "tool_use");
-    if (!toolUse) throw new Error("Claude did not return an analysis");
+    const output = await askJson({ system: SYSTEM_PROMPT, prompt: buildPrompt(input), schema: ANALYSIS_SCHEMA });
 
     const strings = (v, n) => (Array.isArray(v) ? v.map((s) => String(s)).filter(Boolean).slice(0, n) : []);
     const validIds = new Set(COURSES.map((c) => c.id));
     const seen = new Set();
-    const courses = (Array.isArray(toolUse.input.courses) ? toolUse.input.courses : [])
+    const courses = (Array.isArray(output.courses) ? output.courses : [])
       .filter((c) => validIds.has(c.id) && !seen.has(c.id) && seen.add(c.id))
       .slice(0, 3)
       .map((c) => ({ id: c.id, reason: String(c.reason || "") }));
 
     return Response.json({
-      summary: String(toolUse.input.summary || ""),
-      strengths: strings(toolUse.input.strengths, 4),
-      improvements: strings(toolUse.input.improvements, 4),
-      nextSteps: strings(toolUse.input.nextSteps, 3),
+      summary: String(output.summary || ""),
+      strengths: strings(output.strengths, 4),
+      improvements: strings(output.improvements, 4),
+      nextSteps: strings(output.nextSteps, 3),
       courses,
       simulated: false,
     });

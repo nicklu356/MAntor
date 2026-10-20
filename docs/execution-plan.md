@@ -97,8 +97,9 @@
 | Type | Content |
 |------|---------|
 | ✅ Built | Career assessment (scored in the app, AI explanation), project matching, browse and choose projects, task board, Contribution form, team discussion, AI task feedback (based on Criteria), progress panel, AI personal analysis with curated course suggestions, mentor view (anonymous learners) with final feedback |
+| ✅ Added after the hackathon | Mentors create projects (AI drafts criteria and tasks), AI coach on tasks, identity reveal when a mentor is interested in a learner's work, learner portfolio, notifications |
 | 🎭 Simulated | Login ("Viewing as" switch), demo data. Without an API key the AI parts fall back to labelled simulated answers |
-| 🎨 Not built | Mentors creating their own projects, real-time group chat |
+| 🎨 Not built | Real login (Firebase Auth) and Firestore security rules, real-time group chat, email notifications |
 
 * 🏷️ The presentation will **clearly label** what is built and what is simulated
 

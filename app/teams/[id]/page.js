@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import FinalFeedback from "@/components/FinalFeedback";
 import PersonalAnalysis from "@/components/PersonalAnalysis";
 import ProgressPanel from "@/components/ProgressPanel";
+import TeamMembers from "@/components/TeamMembers";
 import { useUser } from "@/components/UserProvider";
 import { getProject, getTasks, getTeam, leaveTeam, updateTask } from "@/lib/db";
 
@@ -28,6 +29,8 @@ export default function TeamPage() {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState("");
+  const [dragging, setDragging] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
 
   const loadTasks = useCallback(() => getTasks(id).then(setTasks), [id]);
 
@@ -45,6 +48,17 @@ export default function TeamPage() {
     const next = ORDER[ORDER.indexOf(task.status) + step];
     if (!next) return;
     await updateTask(task.id, { status: next });
+    loadTasks();
+  }
+
+  // Drag a card to another column (the arrow buttons do the same for keyboard users).
+  async function drop(status) {
+    const task = tasks.find((t) => t.id === dragging);
+    setDragging(null);
+    setDropTarget(null);
+    if (!task || task.status === status) return;
+    setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, status } : t)));
+    await updateTask(task.id, { status });
     loadTasks();
   }
 
@@ -152,13 +166,39 @@ export default function TeamPage() {
         {COLUMNS.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.status);
           return (
-            <section key={col.status} className="column">
+            <section
+              key={col.status}
+              className={dropTarget === col.status ? "column drop-target" : "column"}
+              onDragOver={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                setDropTarget(col.status);
+              }}
+              onDragLeave={() => setDropTarget((s) => (s === col.status ? null : s))}
+              onDrop={(e) => {
+                e.preventDefault();
+                drop(col.status);
+              }}
+            >
               <div className="column-head">
                 <span>{col.label}</span>
                 <span className="badge">{colTasks.length}</span>
               </div>
+              {colTasks.length === 0 && <p className="muted small column-empty">{isMember ? "Drop a task here" : "No tasks"}</p>}
               {colTasks.map((task) => (
-                <article key={task.id} className="task-card">
+                <article
+                  key={task.id}
+                  className={dragging === task.id ? "task-card dragging" : "task-card"}
+                  draggable={isMember}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    setDragging(task.id);
+                  }}
+                  onDragEnd={() => {
+                    setDragging(null);
+                    setDropTarget(null);
+                  }}
+                >
                   <Link href={`/teams/${team.id}/tasks/${task.id}`}>{task.title}</Link>
                   <span className="muted small">
                     {task.assigneeIds.length ? task.assigneeIds.map(userName).join(", ") : "Nobody assigned"}
@@ -195,6 +235,14 @@ export default function TeamPage() {
           );
         })}
       </div>
+
+      {isMember && (
+        <p className="muted small" style={{ marginTop: 8 }}>
+          Tip: drag cards between columns, or use the arrows.
+        </p>
+      )}
+
+      {project && <TeamMembers team={team} project={project} canConnect={isProjectMentor} />}
 
       <ProgressPanel project={project} tasks={tasks} teamId={team.id} />
 

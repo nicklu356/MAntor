@@ -56,7 +56,20 @@ function LearnerHome({ currentUser }) {
         {currentUser.careerField ? (
           <>
             <div className="muted">You are a good fit for</div>
-            <div className="career-field">{currentUser.careerField}</div>
+            <div className="career-field">
+              {currentUser.careerField}
+              {currentUser.careerMatches?.[0] && (
+                <span className="career-percent">{currentUser.careerMatches[0].percent}% fit</span>
+              )}
+            </div>
+            {currentUser.careerMatches?.length > 1 && (
+              <p className="small">
+                Also a good fit: {currentUser.careerMatches
+                  .slice(1, 3)
+                  .map((m) => `${m.field} (${m.percent}%)`)
+                  .join(", ")}
+              </p>
+            )}
             <p>
               <strong>Why: </strong>
               {currentUser.careerExplanation}
@@ -67,7 +80,7 @@ function LearnerHome({ currentUser }) {
           </>
         ) : (
           <>
-            <p>Answer 6 short questions and we will suggest the projects that fit you best.</p>
+            <p>Rate 32 short work activities (about 5 minutes) and we will suggest the projects that fit you best.</p>
             <Link href="/assessment" className="btn">
               Start the assessment
             </Link>

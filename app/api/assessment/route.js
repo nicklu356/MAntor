@@ -1,7 +1,7 @@
 // Career assessment explanation: "why this field fits you".
 // The score itself is calculated in the browser (lib/assessment.js).
 // Without an API key, or if the AI call fails, a fixed explanation is returned.
-import { FIELDS, FIELD_INFO } from "@/lib/assessment";
+import { FIELDS, FIELD_INFO, RIASEC } from "@/lib/assessment";
 import {
   DATA_RULE,
   askText,
@@ -13,15 +13,15 @@ import {
 } from "@/lib/server/ai";
 
 const SYSTEM_PROMPT = `You explain career assessment results to beginners who are new to the workplace.
-Write 2 to 3 friendly sentences in plain English (no lists, no headings) that say why the given field fits this person, using their own answers as evidence.
-Do not promise jobs or salaries. Do not mention scores.
+The assessment uses Holland's RIASEC interest types. Write 2 to 3 friendly sentences in plain English (no lists, no headings) that say why the recommended field fits this person, using the activities they liked as evidence, and how it relates to their second match.
+Do not promise jobs or salaries. Do not mention percentages or scores.
 ${DATA_RULE}`;
 
 export async function POST(request) {
   const parsed = await readJson(request, 20000);
   if (parsed.error) return Response.json({ error: parsed.error }, { status: parsed.status });
 
-  const { field, answers } = parsed.body || {};
+  const { field, answers, runnerUp, hollandCode } = parsed.body || {};
   if (!FIELDS.includes(field)) {
     return Response.json({ error: "Unknown career field" }, { status: 400 });
   }
@@ -32,9 +32,20 @@ export async function POST(request) {
   const limit = rateLimit(request);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
-  const evidence = (Array.isArray(answers) ? answers : [])
-    .slice(0, 12)
-    .map((a) => `* Q: ${clip(a.question, 200)}\n  A: ${clip(a.answer, 200)}`)
+  const list = (v) => (Array.isArray(v) ? v.slice(0, 10).map((t) => `* ${clip(t, 160)}`) : []);
+  const code = String(hollandCode || "")
+    .split("")
+    .filter((k) => RIASEC[k])
+    .slice(0, 3);
+  const evidence = [
+    `Interest types (strongest first): ${code.map((k) => `${RIASEC[k].name} (${RIASEC[k].description})`).join("; ") || "unknown"}`,
+    FIELDS.includes(runnerUp) ? `Second match: ${runnerUp}` : "",
+    `Activities they liked:`,
+    ...(list(answers?.liked).length ? list(answers.liked) : ["* none"]),
+    `Activities they disliked:`,
+    ...(list(answers?.disliked).length ? list(answers.disliked) : ["* none"]),
+  ]
+    .filter(Boolean)
     .join("\n");
 
   try {

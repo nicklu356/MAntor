@@ -1,18 +1,51 @@
 // Unit tests for the app's pure logic. Run with: npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { QUESTIONS, scoreAssessment } from "../lib/assessment.js";
+import { FIELD_INFO, FIELDS, ITEMS, describeAnswers, scoreAssessment } from "../lib/assessment.js";
 import { average, timeAgo } from "../lib/format.js";
 import { buildNotifications, countUnread } from "../lib/notifications.js";
 import { buildCriteriaResults } from "../lib/progress.js";
 import { cleanProject, fallbackDraft, normaliseDraft } from "../lib/projectDraft.js";
 
-test("assessment picks the field with the most answers", () => {
-  const answers = Object.fromEntries(QUESTIONS.map((q) => [q.id, 1])); // option 1 = Data Analysis
-  const result = scoreAssessment(answers);
-  assert.equal(result.field, "Data Analysis");
-  assert.equal(result.scores["Data Analysis"], QUESTIONS.length);
-  assert.equal(result.runnerUp, null);
+// Someone who loves a field's activities and leans towards its interest types.
+const persona = (field) => {
+  const top = Object.entries(FIELD_INFO[field].profile)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([t]) => t);
+  return Object.fromEntries(ITEMS.map((i) => [i.id, i.field === field ? 5 : top.includes(i.type) ? 4 : 2]));
+};
+
+test("every field has assessment items and a profile", () => {
+  for (const field of FIELDS) {
+    assert.ok(FIELD_INFO[field], field);
+    assert.equal(ITEMS.filter((i) => i.field === field).length, 3, field);
+  }
+  assert.equal(new Set(ITEMS.map((i) => i.id)).size, ITEMS.length, "item ids are unique");
+});
+
+test("assessment recommends the field a persona clearly prefers", () => {
+  for (const field of FIELDS) {
+    const result = scoreAssessment(persona(field));
+    assert.equal(result.field, field);
+    assert.equal(result.confidence, "high", field);
+    assert.equal(result.matches.length, FIELDS.length);
+    assert.equal(result.hollandCode.length, 3);
+  }
+});
+
+test("flat or missing answers lower the confidence", () => {
+  const flat = Object.fromEntries(ITEMS.map((i) => [i.id, 3]));
+  const result = scoreAssessment(flat);
+  assert.equal(result.confidence, "low");
+  assert.ok(result.notes.some((n) => n.includes("same rating")));
+  assert.equal(scoreAssessment({}).confidence, "low");
+});
+
+test("describeAnswers lists liked and disliked activities", () => {
+  const { liked, disliked } = describeAnswers({ a01: 5, a02: 1, a03: 3 });
+  assert.equal(liked.length, 1);
+  assert.equal(disliked.length, 1);
 });
 
 test("progress keeps the score history per criterion, oldest first", () => {

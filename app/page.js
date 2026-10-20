@@ -291,12 +291,24 @@ function MentorHome({ currentUser, userName }) {
 }
 
 export default function HomePage() {
-  const { currentUser, isMentor, userName } = useUser();
+  const { currentUser, isMentor, userName, loaded, dataError, users } = useUser();
   return (
     <>
       <Hero />
       {!currentUser ? (
-        <p className="muted">Loading…</p>
+        loaded && (dataError || users.length === 0) ? (
+          <div className="card stack">
+            <h2>{dataError ? "The app cannot read the database" : "No data yet"}</h2>
+            <p>{dataError || "Load the demo users, mentors and projects to get started."}</p>
+            <div>
+              <Link href="/setup" className="btn">
+                Go to setup
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <p className="muted">Loading…</p>
+        )
       ) : isMentor ? (
         <MentorHome currentUser={currentUser} userName={userName} />
       ) : (

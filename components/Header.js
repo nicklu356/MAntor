@@ -10,7 +10,7 @@ import { useUser } from "./UserProvider";
 
 export default function Header() {
   const pathname = usePathname();
-  const { users, currentUser, isMentor, switchUser, userName } = useUser();
+  const { users, currentUser, isMentor, switchUser, userName, loaded, dataError } = useUser();
   const learners = users.filter((u) => u.role === "learner");
   const mentors = users.filter((u) => u.role === "mentor");
 
@@ -64,32 +64,48 @@ export default function Header() {
             {isFirebaseEnabled ? "Firebase" : "Demo data"}
           </span>
           <NotificationBell />
-          <label className="user-switch">
-            <span className="muted small viewing-as">Viewing as</span>
-            <select
-              value={currentUser?.id || ""}
-              onChange={(e) => switchUser(e.target.value)}
-              aria-label="Switch demo user"
-            >
-              {/* In mentor view even this demo switch goes through userName(), so no hidden name is on screen. */}
-              <optgroup label="Learners">
-                {learners.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {userName(u.id)}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Mentors">
-                {mentors.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} (mentor)
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
+          {users.length > 0 && (
+            <label className="user-switch">
+              <span className="muted small viewing-as">Viewing as</span>
+              <select
+                value={currentUser?.id || ""}
+                onChange={(e) => switchUser(e.target.value)}
+                aria-label="Switch demo user"
+              >
+                {/* In mentor view even this demo switch goes through userName(), so no hidden name is on screen. */}
+                <optgroup label="Learners">
+                  {learners.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {userName(u.id)}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Mentors">
+                  {mentors.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} (mentor)
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+          )}
         </div>
       </div>
+      {pathname !== "/setup" && dataError && (
+        <div className="data-banner" role="alert">
+          <div className="container">
+            <strong>Database problem:</strong> {dataError} <Link href="/setup">Open setup →</Link>
+          </div>
+        </div>
+      )}
+      {pathname !== "/setup" && !dataError && loaded && users.length === 0 && (
+        <div className="data-banner" role="status">
+          <div className="container">
+            <strong>The database is empty.</strong> <Link href="/setup">Load the demo data on the setup page →</Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

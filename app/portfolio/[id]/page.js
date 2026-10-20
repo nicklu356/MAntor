@@ -10,7 +10,16 @@ import { useEffect, useState } from "react";
 import { ScoreDots } from "@/components/FeedbackPanel";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
-import { getContributionsForTeam, getProject, getTasks, getTeamFeedback, getTeamsForUser, getUser } from "@/lib/db";
+import { computeAchievements } from "@/lib/achievements";
+import {
+  getContributionsForTeam,
+  getProject,
+  getTasks,
+  getTeamComments,
+  getTeamFeedback,
+  getTeamsForUser,
+  getUser,
+} from "@/lib/db";
 import { average } from "@/lib/format";
 import { buildCriteriaResults } from "@/lib/progress";
 
@@ -18,11 +27,12 @@ async function loadPortfolio(userId) {
   const teams = await getTeamsForUser(userId);
   const entries = await Promise.all(
     teams.map(async (team) => {
-      const [project, tasks, feedback, contributions] = await Promise.all([
+      const [project, tasks, feedback, contributions, comments] = await Promise.all([
         getProject(team.projectId),
         getTasks(team.id),
         getTeamFeedback(team.id),
         getContributionsForTeam(team.id),
+        getTeamComments(team.id),
       ]);
       if (!project) return null;
       const finals = feedback.filter((f) => f.kind === "final");
@@ -31,6 +41,9 @@ async function loadPortfolio(userId) {
         team,
         project,
         tasks,
+        feedback,
+        allContributions: contributions,
+        comments,
         results: buildCriteriaResults(project, tasks, feedback).filter((r) => r.latestScore != null),
         final: finals[finals.length - 1] || null,
         contributions: mine.map((c) => ({ ...c, taskTitle: tasks.find((t) => t.id === c.taskId)?.title })),
@@ -69,6 +82,13 @@ export default function PortfolioPage() {
   const improved = all.flatMap((e) => e.results).filter((r) => r.reviews > 1 && r.latestScore > r.firstScore).length;
   const strengths = [...new Set(all.flatMap((e) => e.results.filter((r) => r.latestScore >= 4).map((r) => r.name)))];
   const mentorOf = (fid) => users.find((u) => u.id === fid);
+  const achievements = entries
+    ? computeAchievements(
+        learner.id,
+        all.map((e) => ({ ...e, contributions: e.allContributions }))
+      )
+    : [];
+  const earned = achievements.filter((a) => a.earned);
 
   async function copyLink() {
     try {
@@ -126,6 +146,33 @@ export default function PortfolioPage() {
           </div>
         )}
       </section>
+
+      {entries && (isOwner || earned.length > 0) && (
+        <section className="card">
+          <div className="spread">
+            <h2>Achievements</h2>
+            <span className="badge badge-blue">
+              {earned.length} of {achievements.length}
+            </span>
+          </div>
+          <div className="achievements">
+            {(isOwner ? achievements : earned).map((a) => (
+              <div key={a.id} className={a.earned ? "achievement earned" : "achievement no-print"}>
+                <span className="achievement-icon" aria-hidden="true">
+                  {a.icon}
+                </span>
+                <div>
+                  <strong>{a.title}</strong>
+                  <div className="muted small">
+                    {a.description}
+                    {a.progress && ` (${a.progress})`}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {entries === null && <div className="card skeleton" />}
       {entries?.length === 0 && (

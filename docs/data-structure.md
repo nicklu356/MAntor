@@ -61,8 +61,14 @@ users (learners and mentors)
 | `name` | string | Real name | `"Mia Chen"` |
 | `anonymousName` | string | Anonymous name, the only name mentors see | `"Learner #A3F"` |
 | `company` | string | Mentor's company (mentors only) | `"Northwind Digital"` |
-| `careerField` | string | Career assessment result (learners only). Saved by the Assessment page | `"UX Design"` |
+| `careerField` | string | Best match from the career assessment (learners only) | `"UX Design"` |
 | `careerExplanation` | string | Short AI explanation of the result (fixed text without an API key) | `"You enjoy understanding how people think..."` |
+| `careerMatches` | array | Every career field with its fit: `{ field, percent }`, best first | `[{ "field": "UX Design", "percent": 84 }]` |
+| `careerProfile` | object | RIASEC interest profile, 0 to 100 per type (`R`, `I`, `A`, `S`, `E`, `C`) | `{ "A": 75, "S": 70, ... }` |
+| `hollandCode` | string | The 3 strongest RIASEC types | `"ASI"` |
+| `careerConfidence` | string | `"high"`, `"medium"` (near tie) or `"low"` (flat or mostly negative answers) | `"high"` |
+| `careerNotes` | array of string | Why the confidence is lower, shown on the result | |
+| `assessedAt` | string | When the assessment was taken | |
 | `createdAt` | string | Created time | |
 
 * 🔒 **Anonymity:** mentor screens show `anonymousName`, never `name`
@@ -137,6 +143,7 @@ users (learners and mentors)
 | `status` | string | `"todo"`, `"in_progress"` or `"done"` | `"todo"` |
 | `assigneeIds` | array of string | Members working on it | `["user_001"]` |
 | `submission` | object or null | The submitted work (see below) | |
+| `helpRequest` | object or null | "Ask the mentor": `userId`, `note`, `at`, `resolvedAt`, `resolvedBy` | |
 | `createdAt` | string | Created time | |
 
 **`submission`:**
@@ -161,6 +168,7 @@ users (learners and mentors)
 | `userId` | string | Who wrote it | `"user_001"` |
 | `description` | string | What they did | `"Ran 2 of the 3 interviews and wrote the summary"` |
 | `hoursSpent` | number | Hours spent | `3` |
+| `kudos` | array | Teammates who said thanks: `{ userId, at }` (not the author) | |
 | `createdAt` | string | Created time | |
 
 * 🧾 This is what the **Contribution form** saves

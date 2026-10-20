@@ -1,18 +1,51 @@
 // Unit tests for the app's pure logic. Run with: npm test
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { QUESTIONS, scoreAssessment } from "../lib/assessment.js";
+import { FIELD_INFO, FIELDS, ITEMS, describeAnswers, scoreAssessment } from "../lib/assessment.js";
 import { average, timeAgo } from "../lib/format.js";
 import { buildNotifications, countUnread } from "../lib/notifications.js";
 import { buildCriteriaResults } from "../lib/progress.js";
 import { cleanProject, fallbackDraft, normaliseDraft } from "../lib/projectDraft.js";
 
-test("assessment picks the field with the most answers", () => {
-  const answers = Object.fromEntries(QUESTIONS.map((q) => [q.id, 1])); // option 1 = Data Analysis
-  const result = scoreAssessment(answers);
-  assert.equal(result.field, "Data Analysis");
-  assert.equal(result.scores["Data Analysis"], QUESTIONS.length);
-  assert.equal(result.runnerUp, null);
+// Someone who loves a field's activities and leans towards its interest types.
+const persona = (field) => {
+  const top = Object.entries(FIELD_INFO[field].profile)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([t]) => t);
+  return Object.fromEntries(ITEMS.map((i) => [i.id, i.field === field ? 5 : top.includes(i.type) ? 4 : 2]));
+};
+
+test("every field has assessment items and a profile", () => {
+  for (const field of FIELDS) {
+    assert.ok(FIELD_INFO[field], field);
+    assert.equal(ITEMS.filter((i) => i.field === field).length, 3, field);
+  }
+  assert.equal(new Set(ITEMS.map((i) => i.id)).size, ITEMS.length, "item ids are unique");
+});
+
+test("assessment recommends the field a persona clearly prefers", () => {
+  for (const field of FIELDS) {
+    const result = scoreAssessment(persona(field));
+    assert.equal(result.field, field);
+    assert.equal(result.confidence, "high", field);
+    assert.equal(result.matches.length, FIELDS.length);
+    assert.equal(result.hollandCode.length, 3);
+  }
+});
+
+test("flat or missing answers lower the confidence", () => {
+  const flat = Object.fromEntries(ITEMS.map((i) => [i.id, 3]));
+  const result = scoreAssessment(flat);
+  assert.equal(result.confidence, "low");
+  assert.ok(result.notes.some((n) => n.includes("same rating")));
+  assert.equal(scoreAssessment({}).confidence, "low");
+});
+
+test("describeAnswers lists liked and disliked activities", () => {
+  const { liked, disliked } = describeAnswers({ a01: 5, a02: 1, a03: 3 });
+  assert.equal(liked.length, 1);
+  assert.equal(disliked.length, 1);
 });
 
 test("progress keeps the score history per criterion, oldest first", () => {
@@ -124,4 +157,63 @@ test("format helpers", () => {
   assert.equal(timeAgo("2026-01-08T12:00:00Z", now), "2 days ago");
   assert.equal(average([4, 2, null]), 3);
   assert.equal(average([]), null);
+});
+
+test("mentor attention: help first, then low scores, then teams ready for final feedback", async () => {
+  const { buildAttention } = await import("../lib/attention.js");
+  const items = buildAttention([
+    {
+      id: "a",
+      status: "active",
+      project: { title: "P" },
+      tasks: [
+        { id: "t1", title: "One", status: "in_progress", helpRequest: { userId: "u1", at: "2026-01-03", resolvedAt: null } },
+        { id: "t2", title: "Two", status: "todo" },
+      ],
+      feedback: [{ taskId: "t2", kind: "task", createdAt: "2026-01-02", scores: [{ criteriaId: "c1", score: 2 }] }],
+    },
+    {
+      id: "b",
+      status: "active",
+      project: { title: "Q" },
+      tasks: [{ id: "t3", title: "Three", status: "done", helpRequest: { userId: "u2", at: "2026-01-01", resolvedAt: "2026-01-02" } }],
+      feedback: [],
+    },
+  ]);
+  assert.deepEqual(
+    items.map((i) => i.kind),
+    ["help", "struggling", "final"]
+  );
+});
+
+test("achievements are earned from existing records", async () => {
+  const { computeAchievements } = await import("../lib/achievements.js");
+  const project = { field: "Data Analysis", criteria: [{ id: "c1", name: "Clean", description: "d" }] };
+  const entry = {
+    team: { status: "completed" },
+    project,
+    tasks: [{ id: "t1", criteriaIds: ["c1"], submission: { submittedBy: "u1" } }],
+    feedback: [
+      { taskId: "t1", kind: "task", scores: [{ criteriaId: "c1", score: 3 }] },
+      { taskId: "t1", kind: "task", scores: [{ criteriaId: "c1", score: 5 }] },
+      { taskId: null, kind: "final", scores: [{ criteriaId: "c1", score: 4 }] },
+    ],
+    contributions: [{ userId: "u1", hoursSpent: 4, kudos: [{ userId: "u2" }] }],
+    comments: [],
+  };
+  const earned = computeAchievements("u1", [entry]).filter((a) => a.earned).map((a) => a.id);
+  assert.deepEqual(earned, ["first-step", "feedback-loop", "appreciated", "finisher", "mentor-approved"]);
+});
+
+test("notifications include kudos and help requests", () => {
+  const team = {
+    id: "team",
+    project: { title: "P" },
+    tasks: [{ id: "t1", title: "Task", helpRequest: { userId: "u1", note: "stuck", at: "2026-01-02", resolvedAt: null } }],
+    contributions: [{ id: "c1", taskId: "t1", userId: "u1", description: "d", kudos: [{ userId: "u2", at: "2026-01-03" }] }],
+  };
+  const learner = buildNotifications({ viewer: { id: "u1", role: "learner" }, teams: [team], userName: (id) => id });
+  assert.ok(learner.some((i) => i.id.startsWith("kudos:")));
+  const mentor = buildNotifications({ viewer: { id: "m1", role: "mentor" }, teams: [team], userName: (id) => id });
+  assert.ok(mentor.some((i) => i.id.startsWith("help:")));
 });

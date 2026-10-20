@@ -8,12 +8,31 @@ import CoachPanel from "@/components/CoachPanel";
 import CommentThread from "@/components/CommentThread";
 import ContributionForm from "@/components/ContributionForm";
 import FeedbackPanel from "@/components/FeedbackPanel";
+import HelpRequest from "@/components/HelpRequest";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
-import { getContributions, getProject, getTask, getTeam, submitTask } from "@/lib/db";
+import { getContributions, getProject, getTask, getTeam, submitTask, toggleKudos } from "@/lib/db";
 
 const STATUS_LABEL = { todo: "To do", in_progress: "In progress", done: "Done" };
+
+// Teammates thank each other for a contribution.
+function Kudos({ contribution, canGive, mine, onToggle }) {
+  const count = (contribution.kudos || []).length;
+  if (!canGive && !count) return null;
+  if (!canGive) return <span className="muted small">♥ {count} thanks</span>;
+  return (
+    <button
+      className={mine ? "kudos kudos-on" : "kudos"}
+      onClick={onToggle}
+      aria-pressed={mine}
+      aria-label={mine ? "Take back your thanks" : "Thank your teammate"}
+    >
+      ♥ {mine ? "Thanked" : "Thanks"}
+      {count > 0 && ` · ${count}`}
+    </button>
+  );
+}
 
 export default function TaskPage() {
   const { id: teamId, taskId } = useParams();
@@ -146,6 +165,13 @@ export default function TaskPage() {
             <CoachPanel project={project} task={task} criteria={criteria} draft={draft} userId={currentUser.id} />
           )}
 
+          <HelpRequest
+            task={task}
+            isMember={isMember}
+            isProjectMentor={isProjectMentor}
+            onChange={() => getTask(taskId).then(setTask)}
+          />
+
           <CommentThread taskId={taskId} teamId={teamId} canPost={isMember || isProjectMentor} />
         </div>
 
@@ -168,6 +194,15 @@ export default function TaskPage() {
                     <span className="badge">{c.hoursSpent}h</span>
                   </div>
                   <div className="small">{c.description}</div>
+                  <Kudos
+                    contribution={c}
+                    canGive={isMember && c.userId !== currentUser?.id}
+                    mine={(c.kudos || []).some((k) => k.userId === currentUser?.id)}
+                    onToggle={async () => {
+                      await toggleKudos(c.id, currentUser.id);
+                      loadContributions();
+                    }}
+                  />
                 </li>
               ))}
             </ul>

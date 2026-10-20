@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "./UserProvider";
 import {
+  getContributionsForTeam,
   getProject,
   getTasks,
   getTeamComments,
@@ -37,12 +38,13 @@ export default function NotificationBell() {
           );
       const detailed = await Promise.all(
         teams.map(async (team) => {
-          const [tasks, comments, feedback] = await Promise.all([
+          const [tasks, comments, feedback, contributions] = await Promise.all([
             getTasks(team.id),
             getTeamComments(team.id),
             getTeamFeedback(team.id),
+            getContributionsForTeam(team.id),
           ]);
-          return { ...team, tasks, comments, feedback };
+          return { ...team, tasks, comments, feedback, contributions };
         })
       );
       if (cancelled) return;

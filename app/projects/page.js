@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserProvider";
+import { matchPercent } from "@/lib/assessment";
 import { DIFFICULTIES } from "@/lib/config";
 import { getProjects } from "@/lib/db";
 
@@ -16,6 +17,9 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     getProjects().then(setProjects);
+    // /projects?field=UX%20Design (links from the assessment result) opens that field.
+    const wanted = new URLSearchParams(window.location.search).get("field");
+    if (wanted) setField(wanted);
   }, []);
 
   const fields = useMemo(
@@ -31,9 +35,12 @@ export default function ProjectsPage() {
         (difficulty === "Any" || p.difficulty === difficulty) &&
         (!q || [p.title, p.description, p.company, ...(p.criteria || []).map((c) => c.name)].join(" ").toLowerCase().includes(q))
     );
-    const match = (p) =>
-      isMentor ? (p.mentorId === currentUser?.id ? 0 : 1) : p.field === currentUser?.careerField ? 0 : 1;
-    return [...list].sort((a, b) => match(a) - match(b));
+    // Mentors: their own projects first. Learners: best fit first (from the assessment).
+    const rank = (p) =>
+      isMentor
+        ? p.mentorId === currentUser?.id ? 0 : 1
+        : -(matchPercent(currentUser, p.field) ?? (p.field === currentUser?.careerField ? 100 : 0));
+    return [...list].sort((a, b) => rank(a) - rank(b));
   }, [projects, field, difficulty, search, currentUser, isMentor]);
 
   return (
@@ -104,7 +111,10 @@ export default function ProjectsPage() {
             <div className="row">
               <span className="badge badge-blue">{p.field}</span>
               {!isMentor && p.field === currentUser?.careerField && (
-                <span className="badge badge-green">Matches your result</span>
+                <span className="badge badge-green">Best match</span>
+              )}
+              {!isMentor && matchPercent(currentUser, p.field) != null && (
+                <span className="badge">{matchPercent(currentUser, p.field)}% fit</span>
               )}
               {isMentor && p.mentorId === currentUser?.id && <span className="badge badge-green">Your project</span>}
             </div>

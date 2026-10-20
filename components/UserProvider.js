@@ -17,20 +17,29 @@ export function UserProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [connections, setConnections] = useState([]);
+  // loaded: the user list was read. dataError: the database could not be read (shown in the header).
+  const [loaded, setLoaded] = useState(false);
+  const [dataError, setDataError] = useState("");
 
   const refreshUsers = useCallback(() => getUsers().then(setUsers), []);
 
   useEffect(() => {
-    getUsers().then((all) => {
-      setUsers(all);
-      let saved = null;
-      try {
-        saved = window.localStorage.getItem(STORAGE_KEY);
-      } catch {}
-      const valid = all.find((u) => u.id === saved);
-      const firstLearner = all.find((u) => u.role === "learner");
-      setCurrentUserId(valid ? valid.id : firstLearner?.id || all[0]?.id || null);
-    });
+    getUsers()
+      .then((all) => {
+        setUsers(all);
+        setLoaded(true);
+        let saved = null;
+        try {
+          saved = window.localStorage.getItem(STORAGE_KEY);
+        } catch {}
+        const valid = all.find((u) => u.id === saved);
+        const firstLearner = all.find((u) => u.role === "learner");
+        setCurrentUserId(valid ? valid.id : firstLearner?.id || all[0]?.id || null);
+      })
+      .catch((error) => {
+        setDataError(error.message);
+        setLoaded(true);
+      });
   }, []);
 
   const currentUser = users.find((u) => u.id === currentUserId) || null;
@@ -38,11 +47,15 @@ export function UserProvider({ children }) {
 
   const refreshConnections = useCallback(async () => {
     if (!currentUser) return setConnections([]);
-    const rows =
-      currentUser.role === "mentor"
-        ? await getConnectionsForMentor(currentUser.id)
-        : await getConnectionsForLearner(currentUser.id);
-    setConnections(rows);
+    try {
+      const rows =
+        currentUser.role === "mentor"
+          ? await getConnectionsForMentor(currentUser.id)
+          : await getConnectionsForLearner(currentUser.id);
+      setConnections(rows);
+    } catch (error) {
+      setDataError(error.message);
+    }
   }, [currentUser]);
 
   useEffect(() => {
@@ -83,6 +96,8 @@ export function UserProvider({ children }) {
         refreshUsers,
         connections,
         refreshConnections,
+        loaded,
+        dataError,
       }}
     >
       {children}

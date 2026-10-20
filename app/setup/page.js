@@ -1,46 +1,76 @@
 "use client";
 
 // Setup page (not linked in the menu): open /setup in the browser.
-// Loads the demo data into Firebase, or resets demo mode.
-import { useState } from "react";
-import { isFirebaseEnabled, resetDemoData, seedFirebase } from "@/lib/db";
+// Checks the database connection, loads the demo data into Firebase, or resets demo mode.
+import { useEffect, useState } from "react";
+import { getUsers, isFirebaseEnabled, resetDemoData, seedFirebase } from "@/lib/db";
 
 export default function SetupPage() {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(null); // { tone: "ok" | "error", text }
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(null); // { ok, text }
+
+  async function checkConnection() {
+    setStatus({ ok: null, text: "Checking the connection…" });
+    try {
+      const users = await getUsers();
+      setStatus({
+        ok: true,
+        text: users.length
+          ? `Connected. The database has ${users.length} users.`
+          : "Connected. The database is empty: load the demo data below.",
+      });
+    } catch (e) {
+      setStatus({ ok: false, text: e.message });
+    }
+  }
+
+  useEffect(() => {
+    if (isFirebaseEnabled) checkConnection();
+  }, []);
 
   async function handleSeed() {
     setBusy(true);
-    setMessage("");
+    setMessage(null);
     try {
       await seedFirebase();
-      setMessage("Demo data loaded into Firebase. Reload the app to see it.");
+      setMessage({ tone: "ok", text: "Demo data loaded into Firebase. Reload the app to see it." });
+      checkConnection();
     } catch (e) {
-      setMessage(`Failed: ${e.message}. Check your Firestore rules and .env.local values.`);
+      setMessage({ tone: "error", text: e.message });
     }
     setBusy(false);
   }
 
   function handleReset() {
     resetDemoData();
-    setMessage("Demo data reset. Reload the app to start fresh.");
+    setMessage({ tone: "ok", text: "Demo data reset. Reload the app to start fresh." });
   }
 
   return (
-    <div className="card stack" style={{ maxWidth: 640 }}>
+    <div className="card stack" style={{ maxWidth: 680 }}>
       <h1>Setup</h1>
       <p>
         Current mode: <strong>{isFirebaseEnabled ? "Firebase" : "Demo data (saved in this browser)"}</strong>
       </p>
       {isFirebaseEnabled ? (
         <>
+          <div className={status?.ok === false ? "status status-error" : status?.ok ? "status status-ok" : "status"}>
+            <strong>Connection: </strong>
+            {status?.text || "Not checked yet"}
+            <div style={{ marginTop: 8 }}>
+              <button className="btn btn-ghost btn-small" onClick={checkConnection}>
+                Check again
+              </button>
+            </div>
+          </div>
           <p className="muted">
-            Copies the projects, users and example team from <code>lib/seed.js</code> into your Firestore
-            database. Running it again overwrites those records.
+            Copies the users, projects and example teams from <code>lib/seed.js</code> into your Firestore database.
+            Running it again resets those records (anything else you created stays).
           </p>
           <div>
             <button className="btn" onClick={handleSeed} disabled={busy}>
-              {busy ? "Loading…" : "Load demo data into Firebase"}
+              {busy ? "Loading… (up to 15 seconds)" : "Load demo data into Firebase"}
             </button>
           </div>
         </>
@@ -56,7 +86,7 @@ export default function SetupPage() {
           </div>
         </>
       )}
-      {message && <p>{message}</p>}
+      {message && <p className={message.tone === "error" ? "error" : ""}>{message.text}</p>}
     </div>
   );
 }

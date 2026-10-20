@@ -5,7 +5,7 @@
 // Tasks point at criteria by position (criteriaIndexes) until the project is saved.
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
-import { DIFFICULTIES, FIELDS, MAX_PROJECT_DESCRIPTION_CHARS } from "@/lib/config";
+import { DIFFICULTIES, FIELDS, MAX_PROJECT_DESCRIPTION_CHARS, MAX_TEAM_SIZE, MIN_TEAM_SIZE } from "@/lib/config";
 
 const emptyCriterion = () => ({ name: "", description: "" });
 const emptyTask = () => ({ title: "", description: "", criteriaIndexes: [0] });
@@ -153,7 +153,7 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
           <label className="field">
             Team size
             <select value={form.teamSize} onChange={(e) => set({ teamSize: Number(e.target.value) })}>
-              {[2, 3, 4, 5, 6].map((n) => (
+              {Array.from({ length: MAX_TEAM_SIZE - MIN_TEAM_SIZE + 1 }, (_, i) => MIN_TEAM_SIZE + i).map((n) => (
                 <option key={n} value={n}>
                   {n} learners
                 </option>

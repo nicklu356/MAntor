@@ -81,7 +81,7 @@ users (learners and mentors)
 | `mentorId` | string | Mentor who wrote it (links to `users`) | `"user_101"` |
 | `company` | string | Mentor's company | `"Northwind Digital"` |
 | `difficulty` | string | `"beginner"`, `"intermediate"` or `"advanced"` | `"beginner"` |
-| `teamSize` | number | Learners per team | `3` |
+| `teamSize` | number | Learners per team (2 to 5) | `3` |
 | `criteria` | array | Mentor's standards (see below) | |
 | `taskTemplates` | array | Tasks every new team gets (see below) | |
 | `createdAt` | string | Created time | |

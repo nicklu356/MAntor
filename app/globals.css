@@ -1167,3 +1167,13 @@ label.check input {
     break-inside: avoid;
   }
 }
+
+/* ---------- About ---------- */
+
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

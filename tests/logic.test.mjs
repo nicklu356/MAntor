@@ -49,7 +49,7 @@ test("cleanProject keeps existing criterion ids and gives new ones a free id", (
     ["c2", "c1", "c3"]
   );
   assert.deepEqual(saved.taskTemplates[0].criteriaIds, ["c2", "c3"]);
-  assert.equal(saved.teamSize, 6);
+  assert.equal(saved.teamSize, 5);
   assert.equal(saved.title, "T");
 });
 

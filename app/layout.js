@@ -3,7 +3,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import { ToastProvider } from "@/components/Toast";
 import { UserProvider } from "@/components/UserProvider";
-import { APP_NAME, APP_TAGLINE } from "@/lib/config";
+import Link from "next/link";
+import { APP_NAME, APP_TAGLINE, TEAM_NAME } from "@/lib/config";
 
 // Fonts are exposed as CSS variables; app/globals.css builds --font and --font-display from them.
 const body = Inter({ subsets: ["latin"], variable: "--nf-body", display: "swap" });
@@ -33,7 +34,7 @@ export default function RootLayout({ children }) {
             <Header />
             <main className="container main">{children}</main>
             <footer className="footer container muted small">
-              {APP_NAME} · {APP_TAGLINE}
+              {APP_NAME} by {TEAM_NAME} · FEIT Hackathon 2026 · <Link href="/about">About</Link>
             </footer>
           </ToastProvider>
         </UserProvider>

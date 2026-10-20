@@ -55,6 +55,9 @@ export default function ProjectDetailPage() {
   if (project === null) return <p>Project not found.</p>;
 
   const isProjectMentor = Boolean(isMentor && currentUser && project.mentorId === currentUser.id);
+  const openSpots = projectTeams
+    .filter((t) => t.status === "active")
+    .reduce((sum, t) => sum + Math.max(0, project.teamSize - t.memberIds.length), 0);
 
   return (
     <div>
@@ -69,7 +72,14 @@ export default function ProjectDetailPage() {
               <span className="badge badge-blue">{project.field}</span>
               <span className="badge">{project.difficulty}</span>
             </div>
-            <h1 style={{ marginTop: 12 }}>{project.title}</h1>
+            <div className="spread" style={{ marginTop: 12 }}>
+              <h1>{project.title}</h1>
+              {isProjectMentor && (
+                <Link href={`/projects/${project.id}/edit`} className="btn btn-secondary btn-small">
+                  Edit project
+                </Link>
+              )}
+            </div>
             <p>{project.description}</p>
           </section>
 
@@ -138,6 +148,11 @@ export default function ProjectDetailPage() {
           <div>
             <div className="eyebrow">Team size</div>
             {project.teamSize} learners
+          </div>
+          <div>
+            <div className="eyebrow">Teams</div>
+            {projectTeams.filter((t) => t.status === "active").length} active
+            {openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? "s" : ""}` : " · joining starts a new team"}
           </div>
           {isMentor ? (
             <p className="muted small">

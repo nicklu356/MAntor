@@ -48,6 +48,7 @@ users (learners and mentors)
 | `feedback` | AI feedback per task, and the mentor's final feedback per team | ✅ Used |
 | `comments` | Team discussion under a task | ✅ Used |
 | `analyses` | AI personal analysis and course suggestions | ✅ Used |
+| `connections` | A mentor's request to learn who a learner is, and the answer | ✅ Used |
 
 ---
 
@@ -80,7 +81,7 @@ users (learners and mentors)
 | `mentorId` | string | Mentor who wrote it (links to `users`) | `"user_101"` |
 | `company` | string | Mentor's company | `"Northwind Digital"` |
 | `difficulty` | string | `"beginner"`, `"intermediate"` or `"advanced"` | `"beginner"` |
-| `teamSize` | number | Learners per team | `3` |
+| `teamSize` | number | Learners per team (2 to 5) | `3` |
 | `criteria` | array | Mentor's standards (see below) | |
 | `taskTemplates` | array | Tasks every new team gets (see below) | |
 | `createdAt` | string | Created time | |
@@ -101,6 +102,7 @@ users (learners and mentors)
 | `description` | string | Task instructions |
 | `criteriaIds` | array of string | Which criteria this task is judged on |
 
+* ✍️ Mentors create and edit projects at `/projects/new` and `/projects/[id]/edit` (optional `updatedAt`). Edits apply to teams created afterwards; existing criteria keep their ids
 * 📏 `criteria` are the **industry standard set by the mentor**; AI feedback scores work against them
 * 📋 When a new team is created, every template is copied into `tasks` for that team
 
@@ -176,6 +178,7 @@ users (learners and mentors)
 | `source` | string | `"ai"` or `"mentor"` | `"ai"` |
 | `kind` | string | `"task"` (one task) or `"final"` (mentor's final feedback for the team) | `"task"` |
 | `authorId` | string or null | Mentor who wrote a final feedback (links to `users`) | `"user_101"` |
+| `requestedBy` | string or null | Learner who asked for this AI review (used by notifications) | `"user_001"` |
 | `scores` | array | Score per criterion (see below) | |
 | `summary` | string | Overall feedback | `"Good research depth, but..."` |
 | `simulated` | boolean | `true` when no Claude API key was set or the AI call failed | `false` |
@@ -229,6 +232,25 @@ users (learners and mentors)
 
 ---
 
+## 9. 🤝 `connections`
+
+| Field | Type | Description | Example |
+|-------|------|-------------|---------|
+| `id` | string | Connection id | `"conn_001"` |
+| `mentorId` | string | Mentor who asked | `"user_101"` |
+| `learnerId` | string | Learner they asked about | `"user_001"` |
+| `teamId` | string | Team where the mentor saw the work | `"team_001"` |
+| `projectId` | string | Project | `"project_001"` |
+| `message` | string | Optional note from the mentor | `"Your interview summary was excellent."` |
+| `status` | string | `"pending"`, `"accepted"` or `"declined"` | `"pending"` |
+| `createdAt` | string | Sent time | |
+| `respondedAt` | string or null | When the learner answered | |
+
+* 🔒 Mentors see a learner's real `name` only after that learner accepts **their** request. Other mentors still see `anonymousName`
+* 🔁 A declined request can be sent again later
+
+---
+
 ## 🔄 Which data each MVP feature uses
 
 | MVP feature | Reads | Writes |
@@ -243,3 +265,8 @@ users (learners and mentors)
 | AI personal analysis | `feedback`, `contributions`, `projects` | `analyses` |
 | Mentor final feedback | `teams`, `projects`, `tasks` | `feedback` (`kind: "final"`), `teams` (`status`) |
 | Team discussion | `comments` | `comments` |
+| Mentor project editor | `projects` | `projects` |
+| AI coach | `tasks`, `projects.criteria` | nothing (chat kept in the learner's browser) |
+| Identity reveal | `connections` | `connections` |
+| Notifications | `tasks`, `comments`, `feedback`, `connections` | nothing ("read" time kept in the browser) |
+| Portfolio | `teams`, `projects`, `tasks`, `feedback`, `contributions` | nothing |

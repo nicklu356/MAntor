@@ -35,7 +35,7 @@ export function ReviewBadges({ review }) {
   );
 }
 
-export default function FeedbackPanel({ project, task, teamId, contributions, canRequest }) {
+export default function FeedbackPanel({ project, task, teamId, contributions, canRequest, userId }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +67,7 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
         scores: data.scores,
         summary: data.summary,
         simulated: data.simulated,
+        requestedBy: userId || null,
       });
       await load();
     } catch (e) {

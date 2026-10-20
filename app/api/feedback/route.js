@@ -6,9 +6,8 @@
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
 import {
   DATA_RULE,
+  askJson,
   clip,
-  getClient,
-  getModel,
   hasAI,
   rateLimit,
   readJson,
@@ -22,31 +21,30 @@ Be encouraging but honest. Point to what is in the submission. Never invent work
 Write in plain English that a beginner understands.
 ${DATA_RULE}`;
 
-const FEEDBACK_TOOL = {
-  name: "give_feedback",
-  description: "Return structured feedback on the learner's submission.",
-  input_schema: {
-    type: "object",
-    properties: {
-      scores: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            criteriaId: { type: "string" },
-            score: { type: "integer", minimum: 1, maximum: 5 },
-            comment: { type: "string" },
-          },
-          required: ["criteriaId", "score", "comment"],
+// Structured output: Claude must answer with exactly this JSON shape.
+const FEEDBACK_SCHEMA = {
+  type: "object",
+  properties: {
+    scores: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          criteriaId: { type: "string" },
+          score: { type: "integer", description: "1 to 5" },
+          comment: { type: "string" },
         },
-      },
-      summary: {
-        type: "string",
-        description: "2 to 3 sentences: what went well and the single most useful next step.",
+        required: ["criteriaId", "score", "comment"],
+        additionalProperties: false,
       },
     },
-    required: ["scores", "summary"],
+    summary: {
+      type: "string",
+      description: "2 to 3 sentences: what went well and the single most useful next step.",
+    },
   },
+  required: ["scores", "summary"],
+  additionalProperties: false,
 };
 
 function buildPrompt({ project, task, submission, contributions, criteria }) {
@@ -131,20 +129,10 @@ export async function POST(request) {
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   try {
-    const message = await getClient().messages.create({
-      model: getModel(),
-      max_tokens: 1500,
-      system: SYSTEM_PROMPT,
-      tools: [FEEDBACK_TOOL],
-      tool_choice: { type: "tool", name: FEEDBACK_TOOL.name },
-      messages: [{ role: "user", content: buildPrompt(input) }],
-    });
-
-    const toolUse = message.content.find((block) => block.type === "tool_use");
-    if (!toolUse) throw new Error("Claude did not return feedback");
+    const output = await askJson({ system: SYSTEM_PROMPT, prompt: buildPrompt(input), schema: FEEDBACK_SCHEMA });
 
     const validIds = new Set(criteria.map((c) => c.id));
-    const scores = (toolUse.input.scores || [])
+    const scores = (output.scores || [])
       .filter((s) => validIds.has(s.criteriaId))
       .map((s) => ({
         criteriaId: s.criteriaId,
@@ -153,7 +141,7 @@ export async function POST(request) {
       }));
     if (!scores.length) throw new Error("Claude returned no usable scores");
 
-    return Response.json({ scores, summary: String(toolUse.input.summary || ""), simulated: false });
+    return Response.json({ scores, summary: String(output.summary || ""), simulated: false });
   } catch (error) {
     console.error("AI feedback failed, using simulated feedback:", error);
     return Response.json(simulatedFeedback(input, "error"));

@@ -4,16 +4,21 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import CoachPanel from "@/components/CoachPanel";
 import CommentThread from "@/components/CommentThread";
 import ContributionForm from "@/components/ContributionForm";
 import FeedbackPanel from "@/components/FeedbackPanel";
+import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
 import { getContributions, getProject, getTask, getTeam, submitTask } from "@/lib/db";
 
+const STATUS_LABEL = { todo: "To do", in_progress: "In progress", done: "Done" };
+
 export default function TaskPage() {
   const { id: teamId, taskId } = useParams();
   const { currentUser, isMentor, userName } = useUser();
+  const toast = useToast();
   const [team, setTeam] = useState(null);
   const [project, setProject] = useState(null);
   const [task, setTask] = useState(undefined);
@@ -47,17 +52,24 @@ export default function TaskPage() {
     e.preventDefault();
     if (!draft.trim()) return;
     setSaving(true);
-    await submitTask(taskId, currentUser.id, draft.trim());
-    await loadTask();
+    try {
+      const updating = Boolean(task.submission);
+      await submitTask(taskId, currentUser.id, draft.trim());
+      await loadTask();
+      toast(updating ? "Submission updated. Ask for new feedback to see your progress." : "Work submitted");
+    } catch (err) {
+      toast(err.message || "Could not save your submission", "error");
+    }
     setSaving(false);
   }
 
   if (task === undefined) return <p className="muted">Loading…</p>;
-  if (task === null) return <p>Task not found.</p>;
+  if (task === null || task.teamId !== teamId) return <p>Task not found.</p>;
 
   const isMember = Boolean(currentUser && !isMentor && team?.memberIds.includes(currentUser.id));
   const isProjectMentor = Boolean(isMentor && project && project.mentorId === currentUser.id);
   const criteria = (project?.criteria || []).filter((c) => task.criteriaIds.includes(c.id));
+  const unsaved = isMember && draft.trim() !== (task.submission?.content || "").trim() && draft.trim().length > 0;
 
   return (
     <div>
@@ -70,6 +82,12 @@ export default function TaskPage() {
           <section className="card">
             <div className="eyebrow">{project?.title}</div>
             <h1>{task.title}</h1>
+            <div className="row" style={{ marginBottom: 12 }}>
+              <span className="badge">{STATUS_LABEL[task.status]}</span>
+              <span className="muted small">
+                {task.assigneeIds.length ? `Assigned to ${task.assigneeIds.map(userName).join(", ")}` : "Nobody assigned yet"}
+              </span>
+            </div>
             <p>{task.description}</p>
             <div className="eyebrow" style={{ marginTop: 16 }}>
               Mentor criteria for this task
@@ -109,6 +127,7 @@ export default function TaskPage() {
                   <span className="muted small">
                     {draft.length} / {MAX_SUBMISSION_CHARS}
                   </span>
+                  {unsaved && <span className="badge badge-amber">Unsaved changes</span>}
                 </div>
               )}
             </form>
@@ -120,13 +139,23 @@ export default function TaskPage() {
             teamId={teamId}
             contributions={contributions}
             canRequest={isMember}
+            userId={currentUser?.id}
           />
+
+          {isMember && project && (
+            <CoachPanel project={project} task={task} criteria={criteria} draft={draft} userId={currentUser.id} />
+          )}
 
           <CommentThread taskId={taskId} teamId={teamId} canPost={isMember || isProjectMentor} />
         </div>
 
         <aside className="card">
-          <h2>Contributions</h2>
+          <div className="spread">
+            <h2>Contributions</h2>
+            {contributions.length > 0 && (
+              <span className="badge">{contributions.reduce((sum, c) => sum + (Number(c.hoursSpent) || 0), 0)}h total</span>
+            )}
+          </div>
           <p className="muted small">Record what you did, so the team and mentor can see who did what.</p>
           {contributions.length === 0 ? (
             <p className="muted small">No contributions yet.</p>

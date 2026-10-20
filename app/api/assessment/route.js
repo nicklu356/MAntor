@@ -4,9 +4,8 @@
 import { FIELDS, FIELD_INFO } from "@/lib/assessment";
 import {
   DATA_RULE,
+  askText,
   clip,
-  getClient,
-  getModel,
   hasAI,
   rateLimit,
   readJson,
@@ -39,9 +38,7 @@ export async function POST(request) {
     .join("\n");
 
   try {
-    const message = await getClient().messages.create({
-      model: getModel(),
-      max_tokens: 300,
+    const text = await askText({
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -50,12 +47,6 @@ export async function POST(request) {
         },
       ],
     });
-    const text = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join(" ")
-      .trim();
-    if (!text) throw new Error("Empty explanation");
     return Response.json({ explanation: text, simulated: false });
   } catch (error) {
     console.error("AI assessment explanation failed, using fixed text:", error);

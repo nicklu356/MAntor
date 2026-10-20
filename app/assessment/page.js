@@ -123,6 +123,10 @@ export default function AssessmentPage() {
         <p className="muted">
           Six short questions, no right or wrong answers. Pick what feels most like you.
         </p>
+        <p className="muted small">
+          This is a simple rule-based guide to help you pick a first project, not a validated career test. You can retake it
+          any time.
+        </p>
       </div>
 
       {QUESTIONS.map((q, index) => (

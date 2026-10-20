@@ -3,7 +3,7 @@
 // Setup page (not linked in the menu): open /setup in the browser.
 // Checks the database connection, loads the demo data into Firebase, or resets demo mode.
 import { useEffect, useState } from "react";
-import { getUsers, isFirebaseEnabled, resetDemoData, seedFirebase } from "@/lib/db";
+import { firebaseProjectId, getUsers, isFirebaseEnabled, resetDemoData, seedFirebase } from "@/lib/db";
 
 export default function SetupPage() {
   const [message, setMessage] = useState(null); // { tone: "ok" | "error", text }
@@ -52,6 +52,12 @@ export default function SetupPage() {
       <h1>Setup</h1>
       <p>
         Current mode: <strong>{isFirebaseEnabled ? "Firebase" : "Demo data (saved in this browser)"}</strong>
+        {isFirebaseEnabled && (
+          <>
+            {" "}
+            · project <code>{firebaseProjectId}</code>
+          </>
+        )}
       </p>
       {isFirebaseEnabled ? (
         <>

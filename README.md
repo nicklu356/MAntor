@@ -111,12 +111,11 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ### Firebase (shared database)
 
-Demo mode saves data only in your own browser, so teammates cannot see each other's changes. Firebase fixes that.
+Demo mode saves data only in each visitor's own browser, so a project a mentor publishes is invisible to everyone else. Firebase fixes that: everyone shares one database.
 
-1. Go to https://console.firebase.google.com and create a project
-2. **Build > Firestore Database > Create database**, choose **test mode** (fine for a hackathon)
-3. **Project settings > Your apps > Web app (</>)**, register the app
-4. Copy the `firebaseConfig` values into `.env.local`:
+1. Go to https://console.firebase.google.com, click **Create a project** (Google Analytics is not needed)
+2. **Build > Firestore Database > Create database**. Pick a location close to your users (for Melbourne: `australia-southeast2`), then choose **Start in test mode**
+3. **Project settings (⚙️) > General > Your apps > Web (</>)**, register the app (no Hosting needed) and copy the `firebaseConfig` values into `.env.local`:
 
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=...
@@ -127,13 +126,14 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-5. Restart the app, open http://localhost:3000/setup and click **Load demo data into Firebase**
+4. Restart the app (`Ctrl + C`, then `npm run dev`). The header badge now says **Firebase**
+5. Open http://localhost:3000/setup and click **Load demo data into Firebase** (run it again any time to reset the demo records)
 
-The badge in the header shows which mode you are in: **Demo data** or **Firebase**.
+On Vercel, add the same six values under **Settings > Environment Variables**, then **redeploy**: `NEXT_PUBLIC_` values are built into the app, so they only apply to a new deployment.
 
-If you already loaded demo data before this update, open `/setup` and click **Load demo data into Firebase** again so the new records (example feedback, discussion) are added.
+⚠️ **Rules:** test mode lets anyone read and write, and it stops working after 30 days. To keep the prototype running, paste `firestore.rules` from this repo into **Firestore > Rules** and publish (it allows access until 31 Dec 2026). Before real users sign up, replace it with rules based on Firebase Auth.
 
-⚠️ Test mode rules expire after 30 days and let anyone read and write. That is fine for the hackathon, not for a real product.
+🧪 **Test without a real project:** the Firestore emulator works too. Install the Firebase CLI, run `firebase emulators:start --only firestore --project demo-mantor`, and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor` and `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` in `.env.local`.
 
 ---
 

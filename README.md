@@ -131,7 +131,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=...
 
 On Vercel, add the same six values under **Settings > Environment Variables**, then **redeploy**: `NEXT_PUBLIC_` values are built into the app, so they only apply to a new deployment.
 
-⚠️ **Rules:** test mode lets anyone read and write, and it stops working after 30 days. To keep the prototype running, paste `firestore.rules` from this repo into **Firestore > Rules** and publish (it allows access until 31 Dec 2026). Before real users sign up, replace it with rules based on Firebase Auth.
+⚠️ **Rules:** test mode lets anyone read and write, and it stops working after 30 days. To keep the prototype running, paste `firestore.rules` from this repo into **Firestore > Rules** and publish (it allows access until 31 Dec 2030). Before real users sign up, replace it with rules based on Firebase Auth.
 
 🧪 **Test without a real project:** the Firestore emulator works too. Install the Firebase CLI, run `firebase emulators:start --only firestore --project demo-mantor`, and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor` and `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` in `.env.local`.
 

@@ -35,6 +35,8 @@ Students and career changers need hands-on experience, but online learning rarel
 | Drag-and-drop task board, project search and filters, toasts, 404 and error pages | ✅ Built |
 | Unit tests (`npm test`) and GitHub Actions CI (test + build) | ✅ Built |
 | Real accounts (email + password, Google), private profiles, admin-approved mentors, strict Firestore rules | ✅ Built (Firebase Authentication) |
+| Profile step after sign-up (first/last name, date of birth, education), editable on the Account page | ✅ Built |
+| Connect Google to an email account (or add a password to a Google account), email verification | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 
 ### 🔌 What happens without an API key
@@ -132,6 +134,10 @@ NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
 On Vercel, add the same six values under **Settings > Environment Variables** for **Production and Preview**, then **redeploy**: `NEXT_PUBLIC_` values are built into the app, so they only apply to a new deployment. Vercel warns that `NEXT_PUBLIC_` values are visible in the browser: that is expected for Firebase web config, so click **Change to Config**. Never put `ANTHROPIC_API_KEY` behind a `NEXT_PUBLIC_` name.
+
+If Google sign-in does nothing or shows an error, open `/setup` on the live site: it lists which Firebase settings reached the deployment and the exact domain to add to **Authorized domains**. Google also blocks sign-in inside the built-in browsers of LINE, Instagram and Facebook: open the site in Safari or Chrome.
+
+**Vercel:** connect the repository to **one** Vercel project. A second project created from the same repository builds every push too, and fails if its Framework Preset is not Next.js (`vercel.json` now sets it, but the duplicate still has no environment variables).
 
 **2. Publish the security rules**
 

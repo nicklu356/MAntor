@@ -217,3 +217,29 @@ test("notifications include kudos and help requests", () => {
   const mentor = buildNotifications({ viewer: { id: "m1", role: "mentor" }, teams: [team], userName: (id) => id });
   assert.ok(mentor.some((i) => i.id.startsWith("help:")));
 });
+
+test("profile details: names, age limit and education", async () => {
+  const { splitName, validateProfile, ageOn, cleanProfile } = await import("../lib/profile.js");
+  assert.deepEqual(splitName("Ada Lovelace King"), { firstName: "Ada Lovelace", lastName: "King" });
+  assert.deepEqual(splitName("Cher"), { firstName: "Cher", lastName: "" });
+  const today = new Date("2026-11-01T12:00:00");
+  assert.equal(ageOn("2000-11-02", today), 25);
+  assert.equal(ageOn("2000-11-01", today), 26);
+  const ok = {
+    firstName: "Ada",
+    lastName: "King",
+    dateOfBirth: "2003-05-04",
+    educationLevel: "Bachelor's degree",
+    school: "University of Melbourne",
+    fieldOfStudy: "Engineering",
+    graduationYear: "2027",
+  };
+  assert.equal(validateProfile(ok, today), "");
+  assert.match(validateProfile({ ...ok, dateOfBirth: "2020-01-01" }, today), /at least 13/);
+  assert.match(validateProfile({ ...ok, dateOfBirth: "2030-01-01" }, today), /future/);
+  assert.match(validateProfile({ ...ok, educationLevel: "Wizard" }, today), /education/);
+  assert.match(validateProfile({ ...ok, graduationYear: "1800" }, today), /graduation year/);
+  assert.equal(validateProfile({ ...ok, graduationYear: "" }, today), "");
+  assert.equal(cleanProfile(ok).name, "Ada King");
+  assert.equal(cleanProfile({ ...ok, graduationYear: "" }).graduationYear, null);
+});

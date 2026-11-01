@@ -6,11 +6,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { firebaseProjectId, getProjects, resetDemoData } from "@/lib/db";
+import { firebaseSettings } from "@/lib/firebase";
 
 export default function SetupPage() {
   const { mode, isAdmin, signedOut } = useUser();
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState(null); // { ok, text }
+  const [host, setHost] = useState("");
+
+  useEffect(() => {
+    setHost(window.location.hostname);
+  }, []);
 
   async function checkConnection() {
     setStatus({ ok: null, text: "Checking the connection…" });
@@ -72,6 +78,36 @@ export default function SetupPage() {
           </button>
         </div>
       </div>
+      <section className="stack">
+        <h2>Firebase settings in this deployment</h2>
+        <ul className="list-plain small">
+          {firebaseSettings.map((s) => (
+            <li key={s.name}>
+              <span className={s.ok ? "badge badge-green" : "badge badge-amber"}>{s.ok ? "Set" : "Missing"}</span>{" "}
+              <code>{s.name}</code>
+              {s.value && (
+                <>
+                  {" "}
+                  = <code>{s.value}</code>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="status">
+          <strong>Google sign-in checklist</strong>
+          <ol className="small" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            <li>
+              <code>NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</code> above is set (normally <code>{firebaseProjectId}.firebaseapp.com</code>)
+            </li>
+            <li>Firebase &gt; Authentication &gt; Sign-in method: Google is enabled (with a support email)</li>
+            <li>
+              Firebase &gt; Authentication &gt; Settings &gt; Authorized domains includes <code>{host || "this site's domain"}</code>
+            </li>
+            <li>The page is open in Safari, Chrome, Edge or Firefox, not inside LINE, Instagram or Facebook</li>
+          </ol>
+        </div>
+      </section>
       <p className="muted">
         Sample projects, mentor approvals and clean-up are on the{" "}
         {isAdmin ? <Link href="/admin">Admin page</Link> : "Admin page (admins only)"}.

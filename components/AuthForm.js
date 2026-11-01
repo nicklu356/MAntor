@@ -157,6 +157,11 @@ export default function AuthForm({ kind }) {
         </button>
       </form>
 
+      {signingUp && (
+        <p className="muted small">
+          By creating an account you agree to the <Link href="/privacy">privacy policy and terms</Link>.
+        </p>
+      )}
       <div className="spread small">
         {signingUp ? (
           <span>

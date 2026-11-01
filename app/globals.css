@@ -1515,3 +1515,9 @@ details.match summary::-webkit-details-marker {
 .public-url {
   word-break: break-all;
 }
+
+.danger-zone {
+  padding: 14px;
+  border-radius: 8px;
+  border: 2px solid var(--error);
+}

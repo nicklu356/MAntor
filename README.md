@@ -40,6 +40,7 @@ Students and career changers need hands-on experience, but online learning rarel
 | Profile photos (shrunk in the browser, same privacy as real names) | ✅ Built |
 | Verified AI feedback (scored and saved by the server) and a public portfolio link for CVs | ✅ Built (needs `FIREBASE_SERVICE_ACCOUNT`) |
 | Ad blocker detection with a clear message when it stops Google sign-in | ✅ Built |
+| Privacy policy and terms, "Download my data", "Delete my account" | ✅ Built (deletion needs `FIREBASE_SERVICE_ACCOUNT`) |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 
 ### 🔌 What happens without an API key
@@ -221,7 +222,9 @@ app/
   teams/[id]/page.js               Task board, progress, personal analysis, mentor final feedback
   teams/[id]/tasks/[taskId]/page.js  Task: submission, contributions, AI feedback, discussion
   setup/page.js                    Check the database connection / reset the demo data
-  login, signup, account           Sign in (email or Google), sign up, your account and mentor application
+  login, signup, account           Sign in (email or Google), sign up, your account, mentor application, your data
+  privacy/page.js                  Privacy policy and terms
+  api/account/delete/route.js      Deletes an account and the data that belongs to it (server)
   admin/page.js                    Admin: approve mentors, load sample projects, remove old demo records
   p/[id]/page.js                   Public portfolio (no login; built on the server)
   api/feedback/route.js            AI task feedback (server, keeps the key secret)

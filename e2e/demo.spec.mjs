@@ -157,6 +157,11 @@ test("portfolio shows a completed project and achievements", async ({ page }) =>
   expect(await page.locator(".achievement.earned").count()).toBeGreaterThanOrEqual(4);
 });
 
+test("privacy and terms page is linked from the footer", async ({ page }) => {
+  await page.click("footer >> text=Privacy and terms");
+  await expect(page.locator("main h1")).toContainText("Privacy and terms");
+});
+
 test("unknown pages show the not-found page", async ({ page }) => {
   await page.goto("/no-such-page");
   await expect(page.locator("main")).toContainText("Page not found");

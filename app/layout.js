@@ -37,7 +37,8 @@ export default function RootLayout({ children }) {
               <AuthGate>{children}</AuthGate>
             </main>
             <footer className="footer container muted small">
-              {APP_NAME} by {TEAM_NAME} · FEIT Hackathon 2026 · <Link href="/about">About</Link>
+              {APP_NAME} by {TEAM_NAME} · FEIT Hackathon 2026 · <Link href="/about">About</Link> ·{" "}
+              <Link href="/privacy">Privacy and terms</Link>
             </footer>
           </ToastProvider>
         </UserProvider>

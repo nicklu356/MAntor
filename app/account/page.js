@@ -16,7 +16,10 @@ import {
   prepareGoogleSignIn,
   resendVerification,
 } from "@/lib/auth";
+import Link from "next/link";
+import { currentAuthUser } from "@/lib/auth";
 import { requestMentorRole } from "@/lib/db";
+import { collectMyData, downloadJson } from "@/lib/exportData";
 
 function MentorApplication({ user, onSaved }) {
   const toast = useToast();
@@ -221,6 +224,100 @@ function SignInMethods() {
   );
 }
 
+// Your data: download a copy, or delete the account and the data that belongs to you.
+function YourData() {
+  const toast = useToast();
+  const { currentUser, signOut } = useUser();
+  const [exporting, setExporting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function download() {
+    setExporting(true);
+    try {
+      const data = await collectMyData(currentUser.id);
+      downloadJson(data, `mantor-my-data-${new Date().toISOString().slice(0, 10)}.json`);
+      toast("Your data was downloaded");
+    } catch (e) {
+      toast(e.message || "Could not collect your data", "error");
+    }
+    setExporting(false);
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setError("");
+    try {
+      const token = await currentAuthUser()?.getIdToken(true);
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirm: typed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Your account could not be deleted");
+      await signOut(); // goes to the home page
+    } catch (e) {
+      setError(e.message);
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <section className="card stack">
+      <h2>Your data</h2>
+      <p className="muted small">
+        See what we store and why in the <Link href="/privacy">Privacy policy</Link>.
+      </p>
+      <div>
+        <button className="btn btn-secondary btn-small" onClick={download} disabled={exporting}>
+          {exporting ? "Collecting…" : "Download my data"}
+        </button>
+      </div>
+      <div className="danger-zone stack">
+        <strong>Delete my account</strong>
+        <p className="small">
+          This permanently deletes your profile, photo, assessment, personal analyses, comments, contribution records,
+          mentor connections and your login. Work you submitted for a team stays with the team, without your name. It
+          cannot be undone.
+        </p>
+        {!confirming ? (
+          <div>
+            <button className="btn btn-danger btn-small" onClick={() => setConfirming(true)}>
+              Delete my account…
+            </button>
+          </div>
+        ) : (
+          <div className="stack">
+            <label className="field">
+              Type DELETE to confirm
+              <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" aria-label="Type DELETE to confirm" />
+            </label>
+            {error && <p className="error small">{error}</p>}
+            <div className="row">
+              <button className="btn btn-danger-solid btn-small" onClick={remove} disabled={typed !== "DELETE" || deleting}>
+                {deleting ? "Deleting…" : "Permanently delete my account"}
+              </button>
+              <button
+                className="btn btn-ghost btn-small"
+                onClick={() => {
+                  setConfirming(false);
+                  setTyped("");
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function AccountPage() {
   const toast = useToast();
   const { mode, currentUser, refreshUsers, signOut } = useUser();
@@ -258,6 +355,8 @@ export default function AccountPage() {
         <h2>Mentoring</h2>
         <MentorApplication user={currentUser} onSaved={refreshUsers} />
       </section>
+
+      <YourData />
 
       <div>
         <button className="btn btn-ghost" onClick={signOut}>

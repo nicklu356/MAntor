@@ -13,6 +13,7 @@ import { startDemo } from "@/lib/session";
 const isPublic = (path) =>
   path === "/" ||
   path === "/about" ||
+  path === "/privacy" ||
   path === "/login" ||
   path === "/signup" ||
   path === "/projects" ||
@@ -24,7 +25,7 @@ export default function AuthGate({ children }) {
   const { signedOut, currentUser, profileComplete } = useUser();
 
   // New accounts (and older ones missing details) complete their profile before anything else.
-  if (currentUser && !profileComplete && pathname !== "/about" && !pathname.startsWith("/p/")) {
+  if (currentUser && !profileComplete && !["/about", "/privacy"].includes(pathname) && !pathname.startsWith("/p/")) {
     return (
       <div className="card stack" style={{ maxWidth: 760 }}>
         <div>

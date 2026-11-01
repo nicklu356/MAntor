@@ -193,7 +193,7 @@ export function UserProvider({ children }) {
   const userName = useCallback(
     (id) => {
       const user = users.find((u) => u.id === id);
-      if (!user) return "Unknown";
+      if (!user) return "Former member"; // the account was deleted
       if (currentUser && id === currentUser.id) return currentUser.name || user.anonymousName;
       if (isMentor && user.role === "learner") {
         return revealed.has(id) ? revealed.get(id) || user.name || user.anonymousName : user.anonymousName;

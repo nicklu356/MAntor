@@ -282,6 +282,51 @@ test("demo sandbox from a signed-out browser, and back", async () => {
   await expect(visitor.locator("main")).toContainText("Create a free account");
 });
 
+test("privacy: download my data, then delete the account and everything that belongs to it", async () => {
+  await visitor.goto("/privacy");
+  await expect(visitor.locator("main h1")).toContainText("Privacy and terms");
+
+  const dora = await (await browser.newContext({ acceptDownloads: true })).newPage();
+  await signUp(dora, "Dora Delete", email("dora"));
+  await dora.goto(projectUrl);
+  await dora.click("text=Join this project");
+  await dora.waitForURL(/\/teams\//);
+  const doraTeam = dora.url().split("/teams/")[1];
+  await dora.locator(".task-card a").first().click();
+  await dora.fill('textarea[aria-label="Message"]', "Hello from Dora");
+  await dora.click("button:has-text('Send')");
+  await expect(dora.locator("main")).toContainText("Hello from Dora");
+  const doraUid = await uidOf(email("dora"));
+
+  await dora.goto("/account");
+  const [download] = await Promise.all([dora.waitForEvent("download"), dora.click("text=Download my data")]);
+  const exported = JSON.parse(await (await import("node:fs/promises")).readFile(await download.path(), "utf8"));
+  expect(exported.profile.name).toBe("Dora Delete");
+  expect(exported.projects[0].myComments[0].text).toBe("Hello from Dora");
+
+  await dora.click("text=Delete my account…");
+  await dora.fill('input[aria-label="Type DELETE to confirm"]', "DELETE");
+  await dora.click("text=Permanently delete my account");
+  await expect(dora.locator("main")).toContainText("Create a free account"); // logged out, back home
+
+  const exists = async (path) =>
+    (await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`, { headers: owner })).ok;
+  expect(await exists(`users/${doraUid}`)).toBeFalsy();
+  expect(await exists(`profiles/${doraUid}`)).toBeFalsy();
+  const team = await (await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/teams/${doraTeam}`, { headers: owner })).json();
+  expect(JSON.stringify(team.fields.memberIds)).not.toContain(doraUid);
+  const comments = await allDocs("comments");
+  expect(comments.some((c) => c.fields.userId?.stringValue === doraUid)).toBeFalsy();
+  const accounts = await (
+    await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:query`, {
+      method: "POST",
+      headers: { ...owner, "Content-Type": "application/json" },
+      body: "{}",
+    })
+  ).json();
+  expect(accounts.userInfo.some((u) => u.email === email("dora"))).toBeFalsy();
+});
+
 test("log out, wrong password, log back in", async () => {
   await bob.goto("/account");
   await bob.click("main >> text=Log out");

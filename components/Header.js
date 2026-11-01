@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import Avatar from "./Avatar";
 import NotificationBell from "./NotificationBell";
 import { APP_NAME } from "@/lib/config";
 import { exitDemo } from "@/lib/session";
@@ -101,9 +102,7 @@ export default function Header() {
           {/* Real accounts */}
           {mode === "auth" && currentUser && (
             <Link href="/account" className="account-chip" title="Your account">
-              <span className="account-avatar" aria-hidden="true">
-                {(currentUser.name || "?").trim().charAt(0).toUpperCase()}
-              </span>
+              <Avatar id={currentUser.id} size={32} />
               <span className="account-name">{currentUser.name}</span>
             </Link>
           )}

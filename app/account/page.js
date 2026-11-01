@@ -2,6 +2,7 @@
 
 // Your account: basic details, how you log in, and the application to become a mentor.
 import { useEffect, useState } from "react";
+import PhotoPicker from "@/components/PhotoPicker";
 import ProfileForm from "@/components/ProfileForm";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
@@ -10,6 +11,7 @@ import {
   connectGoogle,
   disconnectGoogle,
   explainAuthError,
+  explainGoogleError,
   googleSignInProblem,
   prepareGoogleSignIn,
   resendVerification,
@@ -97,6 +99,7 @@ function SignInMethods() {
   }, [hasGoogle, googleProblem]);
 
   async function act(key, action, success) {
+    const startedAt = Date.now();
     setBusy(key);
     setError("");
     try {
@@ -108,7 +111,9 @@ function SignInMethods() {
       setError(
         key === "password" && e?.code === "auth/email-already-in-use"
           ? "A password could not be added here. Log out, click “Forgot password?” on the log in page, and enter this email: the link lets you set a password."
-          : explainAuthError(e)
+          : key === "google"
+            ? await explainGoogleError(e, startedAt)
+            : explainAuthError(e)
       );
     }
     setBusy("");
@@ -243,6 +248,7 @@ export default function AccountPage() {
 
       <section className="card stack">
         <h2>Your details</h2>
+        <PhotoPicker />
         <ProfileForm submitLabel="Save changes" onSaved={() => toast("Details saved")} />
       </section>
 

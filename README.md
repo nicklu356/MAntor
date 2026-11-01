@@ -37,6 +37,9 @@ Students and career changers need hands-on experience, but online learning rarel
 | Real accounts (email + password, Google), private profiles, admin-approved mentors, strict Firestore rules | ✅ Built (Firebase Authentication) |
 | Profile step after sign-up (first/last name, date of birth, education), editable on the Account page | ✅ Built |
 | Connect Google to an email account (or add a password to a Google account), email verification | ✅ Built |
+| Profile photos (shrunk in the browser, same privacy as real names) | ✅ Built |
+| Verified AI feedback (scored and saved by the server) and a public portfolio link for CVs | ✅ Built (needs `FIREBASE_SERVICE_ACCOUNT`) |
+| Ad blocker detection with a clear message when it stops Google sign-in | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 
 ### 🔌 What happens without an API key
@@ -149,11 +152,23 @@ Paste `firestore.rules` from this repo into **Firestore Database > Rules** and c
 2. In the Firebase console open **Firestore Database > Data > users**, find the document whose id is your user id (shown in **Authentication > Users**), and add a field `admin` of type **boolean** set to `true`. Nobody can give themselves this field from the app
 3. Reload the app: an **Admin** link appears. There you can **Load sample projects**, approve **mentor applications** (people apply from their Account page), and **Remove old demo records** if you loaded the old demo data into this database before
 
+**4. Server key (recommended)**
+
+Two features need the server to use Firebase with full access: **verified AI feedback** (the server scores and saves every review, so nobody can fake a score) and **public portfolios** (`/p/<id>`, a link learners can put on a CV; it is built by the server and shows only verified scores and mentors' own feedback).
+
+1. Firebase console > **Project settings > Service accounts > Generate new private key**. A JSON file downloads
+2. Vercel > **Settings > Environment Variables**: add `FIREBASE_SERVICE_ACCOUNT` (Production and Preview) and paste the whole JSON file as the value. **Never** give it a `NEXT_PUBLIC_` name and never commit the file: it gives full access to your database
+3. Redeploy
+
+Without it the app still works: feedback is saved by the browser (shown without the ✓ Verified badge) and public portfolio links say “unavailable”.
+
 **What stays private:** a learner's real name and email are in `profiles/{uid}` (only they can read it). Teammates see each other's names through `teamNames/{teamId}` (members only). Mentors see anonymous names until a learner accepts their connection request.
 
-**Known limits:** AI feedback is saved by the learner's browser, so a determined learner could save made-up scores for their own team (moving that save to the server with the Firebase Admin SDK fixes it). Portfolios are only visible to signed-in users.
+**Photos:** profile photos are shrunk to 256 × 256 in the browser and stored in Firestore (no Firebase Storage or paid plan needed). Like real names, a learner's photo is only visible to them, their teammates, mentors they accepted, and their public portfolio if they publish it.
 
-🧪 **Test without a real project:** the Firebase emulators work too. Install the Firebase CLI, run `firebase emulators:start --only firestore,auth --project demo-mantor` (with `firestore.rules` set as the rules file in `firebase.json`), and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor`, `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` and `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` in `.env.local`.
+**Known limits:** without `FIREBASE_SERVICE_ACCOUNT`, AI feedback is saved by the browser, so a determined learner could save made-up scores for their own team; those reviews never show as verified or on public portfolios.
+
+🧪 **Test without a real project:** the Firebase emulators work too. Install the Firebase CLI, run `firebase emulators:start --only firestore,auth --project demo-mantor` (with `firestore.rules` set as the rules file in `firebase.json`), and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor`, `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` and `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` in `.env.local`. For the server features, start the app with `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` (no service account needed).
 
 ---
 
@@ -201,6 +216,7 @@ app/
   setup/page.js                    Check the database connection / reset the demo data
   login, signup, account           Sign in (email or Google), sign up, your account and mentor application
   admin/page.js                    Admin: approve mentors, load sample projects, remove old demo records
+  p/[id]/page.js                   Public portfolio (no login; built on the server)
   api/feedback/route.js            AI task feedback (server, keeps the key secret)
   api/analysis/route.js            AI personal analysis + course picks
   api/assessment/route.js          AI "why this field fits you" text
@@ -210,7 +226,9 @@ app/
 components/
   Header.js                        Menu, AI/mode badges, "Viewing as" switch (learners and mentors)
   UserProvider.js                  Who is using the app (demo switch or signed-in account); userName() decides which name each viewer may see
-  AuthGate.js, AuthForm.js         Pages that need an account; the log in / sign up form
+  AuthGate.js, AuthForm.js         Pages that need an account (and the profile step); the log in / sign up form
+  ProfileForm.js, PhotoPicker.js   Basic details and profile photo
+  Avatar.js, PublicLink.js         Photo or initials; the public portfolio switch
   ContributionForm.js              Contribution form
   FeedbackPanel.js                 AI feedback with score changes and history
   ProgressPanel.js                 Tasks done + score history per criterion
@@ -237,7 +255,10 @@ lib/
   projectDraft.js                  Cleans the project form; normalises the AI draft
   format.js                        timeAgo and other display helpers
   server/ai.js                     Shared AI helpers: fallback checks, rate limit, size limits
-  auth.js                          Firebase Authentication (email, Google, password reset)
+  auth.js                          Firebase Authentication (email, Google, linking, password reset)
+  profile.js, avatar.js, adblock.js  Profile checks, photo shrinking, ad blocker detection
+  server/firebaseAdmin.js          Server access to Firebase (verified feedback, public portfolios)
+  server/portfolio.js              Builds the public portfolio
   session.js                       Demo or real accounts
   firebase.js, mockStore.js, config.js
 tests/                             Unit tests for lib/ (npm test)

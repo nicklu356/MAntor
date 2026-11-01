@@ -48,7 +48,10 @@ export default function ProjectDetailPage() {
     setError("");
     try {
       // With real accounts, the learner's name is shared with their new teammates only.
-      const team = await joinProject(id, currentUser.id, mode === "auth" ? currentUser.name : undefined);
+      const team =
+        mode === "auth"
+          ? await joinProject(id, currentUser.id, currentUser.name, currentUser.photo)
+          : await joinProject(id, currentUser.id);
       router.push(`/teams/${team.id}`);
     } catch (e) {
       setError(e.message || "Could not join the project");

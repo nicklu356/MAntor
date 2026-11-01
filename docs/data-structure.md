@@ -72,6 +72,8 @@ users (learners and mentors)
 | `careerNotes` | array of string | Why the confidence is lower, shown on the result | |
 | `assessedAt` | string | When the assessment was taken | |
 | `admin` | boolean | Can open the Admin page. Only set in the Firebase console | `true` |
+| `portfolioPublic` | boolean | The learner published their portfolio at `/p/<id>` | `true` |
+| `photo` | string | Mentors only: public profile photo (a learner's photo is private, see below) | `"data:image/jpeg;base64,..."` |
 | `mentorRequest` | object or null | Application to become a mentor: `name`, `company`, `note`, `at`, `declinedAt` | |
 | `createdAt` | string | Created time | |
 
@@ -195,6 +197,7 @@ users (learners and mentors)
 | `summary` | string | Overall feedback | `"Good research depth, but..."` |
 | `simulated` | boolean | `true` when no Claude API key was set or the AI call failed | `false` |
 | `sample` | boolean | `true` for the example review in the demo data (shown as "Example") | `false` |
+| `verified` | boolean | `true` when the server scored and saved it (real accounts with `FIREBASE_SERVICE_ACCOUNT`). Browsers can never set it, and only verified scores appear on public portfolios | `true` |
 | `createdAt` | string | Created time | |
 
 **Each item in `scores`:**
@@ -267,11 +270,12 @@ users (learners and mentors)
 
 | Collection | Document id | Fields | Who can read it |
 |------------|-------------|--------|-----------------|
-| `profiles` | user id | `firstName`, `lastName`, `name` (both together), `email`, `dateOfBirth` (`YYYY-MM-DD`), `educationLevel`, `school`, `fieldOfStudy`, `graduationYear` (number or null), `createdAt`, `updatedAt` | Only that user |
+| `profiles` | user id | `firstName`, `lastName`, `name` (both together), `email`, `dateOfBirth` (`YYYY-MM-DD`), `educationLevel`, `school`, `fieldOfStudy`, `graduationYear` (number or null), `photo` (256 × 256 JPEG data URL or null), `createdAt`, `updatedAt` | Only that user |
 | `teamNames` | team id | one field per member: `{ "<uid>": "Alice Wong" }` | Only that team's members |
+| `teamPhotos` | team id | one field per member: `{ "<uid>": "data:image/jpeg;base64,..." }` (max 150,000 characters) | Only that team's members |
 
 * New accounts fill in their profile (name, date of birth, education) before using the app. The checks are in `lib/profile.js` (for example, users must be at least 13)
-* Accepting a mentor's connection request copies the learner's name into the connection (`learnerName`), so only that mentor can see it
+* Accepting a mentor's connection request copies the learner's name and photo into the connection (`learnerName`, `learnerPhoto`), so only that mentor can see them; later changes are copied too
 * The rules for every collection are in `firestore.rules`
 
 ---

@@ -21,6 +21,7 @@ import {
   getUser,
 } from "@/lib/db";
 import { average } from "@/lib/format";
+import PublicLink from "@/components/PublicLink";
 import { buildCriteriaResults } from "@/lib/progress";
 
 async function loadPortfolio(userId) {
@@ -60,7 +61,7 @@ async function loadPortfolio(userId) {
 export default function PortfolioPage() {
   const { id } = useParams();
   const toast = useToast();
-  const { currentUser, users, userName } = useUser();
+  const { mode, currentUser, users, userName } = useUser();
   const [learner, setLearner] = useState(undefined);
   const [entries, setEntries] = useState(null);
 
@@ -146,6 +147,8 @@ export default function PortfolioPage() {
           </div>
         )}
       </section>
+
+      {isOwner && mode === "auth" && <PublicLink />}
 
       {entries && (isOwner || earned.length > 0) && (
         <section className="card">

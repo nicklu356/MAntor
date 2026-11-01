@@ -1,6 +1,9 @@
 // AI task feedback.
-// The browser sends the task, the submission, and the mentor's criteria.
-// Claude scores the submission against each criterion and returns structured feedback.
+// Claude scores the submission against each of the mentor's criteria and returns structured feedback.
+// - Real accounts with FIREBASE_SERVICE_ACCOUNT: the browser sends only the task id and its login
+//   token; the server reads everything from Firestore and saves the review as `verified`.
+// - Otherwise (demo, or no service account): the browser sends the task, submission and criteria,
+//   and saves the review itself.
 // Without ANTHROPIC_API_KEY (or if the AI call fails), a simulated response is returned
 // so the demo never breaks.
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
@@ -13,6 +16,7 @@ import {
   readJson,
   tooManyRequests,
 } from "@/lib/server/ai";
+import { adminDb, hasAdmin, readDoc, readWhere, requestUser } from "@/lib/server/firebaseAdmin";
 
 const SYSTEM_PROMPT = `You are a supportive industry mentor reviewing work from a beginner learner on a project-based learning platform.
 Score the submission ONLY against the mentor's criteria provided.
@@ -88,50 +92,40 @@ function simulatedFeedback({ criteria, submission }, reason) {
   };
 }
 
-export async function POST(request) {
-  const parsed = await readJson(request);
-  if (parsed.error) return Response.json({ error: parsed.error }, { status: parsed.status });
-
-  const { project, task, submission } = parsed.body || {};
+// Turns a project, task, submission and contributions into the prompt input, or an error.
+function buildInput({ project, task, submission, contributions }) {
   if (!project || !task || !submission?.content) {
-    return Response.json({ error: "Project, task and submission are required" }, { status: 400 });
+    return { error: "Project, task and submission are required", status: 400 };
   }
   if (!Array.isArray(project.criteria) || !Array.isArray(task.criteriaIds)) {
-    return Response.json({ error: "Project criteria and task criteria are required" }, { status: 400 });
+    return { error: "Project criteria and task criteria are required", status: 400 };
   }
   if (String(submission.content).length > MAX_SUBMISSION_CHARS) {
-    return Response.json(
-      { error: `Submission is too long (max ${MAX_SUBMISSION_CHARS} characters).` },
-      { status: 413 }
-    );
+    return { error: `Submission is too long (max ${MAX_SUBMISSION_CHARS} characters).`, status: 413 };
   }
-
   const criteria = project.criteria
     .filter((c) => task.criteriaIds.includes(c.id))
     .map((c) => ({ id: clip(c.id, 40), name: clip(c.name, 120), description: clip(c.description, 400) }));
-  if (!criteria.length) {
-    return Response.json({ error: "This task has no criteria to review against" }, { status: 400 });
-  }
-
-  const input = {
-    project: { title: clip(project.title, 200), description: clip(project.description, 1200) },
-    task: { title: clip(task.title, 200), description: clip(task.description, 800) },
-    submission: { content: clip(submission.content, MAX_SUBMISSION_CHARS) },
-    contributions: (Array.isArray(parsed.body.contributions) ? parsed.body.contributions : [])
-      .slice(0, 20)
-      .map((c) => ({ description: clip(c.description, 300), hoursSpent: Number(c.hoursSpent) || 0 })),
-    criteria,
+  if (!criteria.length) return { error: "This task has no criteria to review against", status: 400 };
+  return {
+    input: {
+      project: { title: clip(project.title, 200), description: clip(project.description, 1200) },
+      task: { title: clip(task.title, 200), description: clip(task.description, 800) },
+      submission: { content: clip(submission.content, MAX_SUBMISSION_CHARS) },
+      contributions: (Array.isArray(contributions) ? contributions : [])
+        .slice(0, 20)
+        .map((c) => ({ description: clip(c.description, 300), hoursSpent: Number(c.hoursSpent) || 0 })),
+      criteria,
+    },
   };
+}
 
-  if (!hasAI()) return Response.json(simulatedFeedback(input, "no-key"));
-
-  const limit = rateLimit(request);
-  if (!limit.ok) return tooManyRequests(limit.retryAfter);
-
+// Claude's review, or the simulated one without a key or when the AI call fails.
+async function review(input) {
+  if (!hasAI()) return simulatedFeedback(input, "no-key");
   try {
     const output = await askJson({ system: SYSTEM_PROMPT, prompt: buildPrompt(input), schema: FEEDBACK_SCHEMA });
-
-    const validIds = new Set(criteria.map((c) => c.id));
+    const validIds = new Set(input.criteria.map((c) => c.id));
     const scores = (output.scores || [])
       .filter((s) => validIds.has(s.criteriaId))
       .map((s) => ({
@@ -140,10 +134,76 @@ export async function POST(request) {
         comment: String(s.comment || ""),
       }));
     if (!scores.length) throw new Error("Claude returned no usable scores");
-
-    return Response.json({ scores, summary: String(output.summary || ""), simulated: false });
+    return { scores, summary: String(output.summary || ""), simulated: false };
   } catch (error) {
     console.error("AI feedback failed, using simulated feedback:", error);
-    return Response.json(simulatedFeedback(input, "error"));
+    return simulatedFeedback(input, "error");
   }
+}
+
+// Real accounts with FIREBASE_SERVICE_ACCOUNT set: the server reads the task from Firestore itself,
+// checks the caller is in the team, and saves the review marked `verified`. Nothing the browser
+// sends can change the scores.
+async function reviewAndSave(request, taskId) {
+  const user = await requestUser(request);
+  if (!user) return Response.json({ error: "Please log in again." }, { status: 401 });
+  const task = await readDoc("tasks", String(taskId));
+  if (!task) return Response.json({ error: "Task not found" }, { status: 404 });
+  const team = await readDoc("teams", task.teamId);
+  if (!team?.memberIds?.includes(user.uid)) {
+    return Response.json({ error: "Only members of this team can ask for feedback." }, { status: 403 });
+  }
+  const [project, contributions] = await Promise.all([
+    readDoc("projects", task.projectId),
+    readWhere("contributions", "taskId", "==", task.id),
+  ]);
+  const built = buildInput({ project, task, submission: task.submission, contributions });
+  if (built.error) return Response.json({ error: built.error }, { status: built.status });
+
+  if (hasAI()) {
+    const limit = rateLimit(request);
+    if (!limit.ok) return tooManyRequests(limit.retryAfter);
+  }
+  const result = await review(built.input);
+  const id = `fb_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const record = {
+    taskId: task.id,
+    teamId: task.teamId,
+    source: "ai",
+    kind: "task",
+    authorId: null,
+    requestedBy: user.uid,
+    scores: result.scores,
+    summary: result.summary,
+    simulated: Boolean(result.simulated),
+    sample: false,
+    verified: true,
+    createdAt: new Date().toISOString(),
+  };
+  await adminDb().collection("feedback").doc(id).set(record);
+  return Response.json({ ...record, id, saved: true });
+}
+
+export async function POST(request) {
+  const parsed = await readJson(request);
+  if (parsed.error) return Response.json({ error: parsed.error }, { status: parsed.status });
+  const body = parsed.body || {};
+
+  if (body.taskId && hasAdmin() && request.headers.get("authorization")) {
+    try {
+      return await reviewAndSave(request, body.taskId);
+    } catch (error) {
+      console.error("Saving verified feedback failed:", error);
+      return Response.json({ error: "The review could not be saved. Please try again." }, { status: 500 });
+    }
+  }
+
+  // Demo, or no service account: review what the browser sent; the browser saves it (unverified).
+  const built = buildInput(body);
+  if (built.error) return Response.json({ error: built.error }, { status: built.status });
+  if (hasAI()) {
+    const limit = rateLimit(request);
+    if (!limit.ok) return tooManyRequests(limit.retryAfter);
+  }
+  return Response.json(await review(built.input));
 }

@@ -5,20 +5,10 @@
 // Nothing is revealed until the learner accepts (see the requests card on the learner's home).
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import Avatar from "@/components/Avatar";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { getContributionsForTeam, requestConnection } from "@/lib/db";
-
-// "Mia Chen" -> "MC", "Learner #A3F" -> "A3F"
-const initials = (name) =>
-  name.startsWith("Learner #")
-    ? name.slice(9)
-    : name
-        .split(" ")
-        .map((w) => w[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase();
 
 export default function TeamMembers({ team, project, canConnect }) {
   const toast = useToast();
@@ -76,9 +66,7 @@ export default function TeamMembers({ team, project, canConnect }) {
             <li key={id}>
               <div className="spread">
                 <div className="row">
-                  <span className="avatar" aria-hidden="true">
-                    {initials(userName(id))}
-                  </span>
+                  <Avatar id={id} />
                   <div>
                     <Link href={`/portfolio/${id}`}>
                       <strong>{userName(id)}</strong>

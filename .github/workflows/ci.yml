@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    name: Unit tests and build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,3 +18,47 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  e2e-demo:
+    name: End-to-end (demo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-demo
+          path: playwright-report/
+          retention-days: 7
+
+  firebase:
+    name: Security rules and end-to-end (accounts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4 # the Firestore emulator runs on Java
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm install --global firebase-tools@14.27.0
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:rules
+      - run: npm run test:e2e:firebase
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-firebase
+          path: playwright-report-firebase/
+          retention-days: 7

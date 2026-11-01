@@ -1,0 +1,172 @@
+// End-to-end tests of the demo (no Firebase): every test starts with fresh demo data,
+// because each one gets a new browser context (and so a fresh localStorage).
+import { expect, test } from "@playwright/test";
+
+const switchUser = async (page, label) => {
+  await page.selectOption('select[aria-label="Switch demo user"]', { label });
+  await page.waitForTimeout(300);
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("main")).toContainText("Hi Mia");
+});
+
+test("notifications bell shows unread activity and marks it read", async ({ page }) => {
+  await page.click(".bell-button");
+  await expect(page.locator(".bell-panel")).toContainText("commented on");
+  await page.click("text=Mark all read");
+  await expect(page.locator(".bell-count")).toHaveCount(0);
+});
+
+test("projects: search, field filter from a link, ranked by fit", async ({ page }) => {
+  await page.goto("/projects");
+  await expect(page.locator(".project-card").first()).toContainText("UX Design"); // Mia's best match
+  await page.fill('input[aria-label="Search projects"]', "phishing");
+  await expect(page.locator(".project-card")).toHaveCount(1);
+  await page.goto(`/projects?field=${encodeURIComponent("Sustainability Consulting")}`);
+  await expect(page.locator(".project-card")).toHaveCount(1);
+});
+
+test("task: update submission, get feedback, ask the AI coach", async ({ page }) => {
+  await page.goto("/teams/team_001/tasks/task_001");
+  const box = page.locator('textarea[aria-label="Submission"]');
+  await box.fill((await box.inputValue()) + " Key needs: clear progress, fewer password rules.");
+  await page.click("text=Update submission");
+  await expect(page.locator(".toast")).toContainText("Submission updated");
+  await page.click("text=Get new feedback");
+  await expect(page.locator("main")).toContainText("Simulated");
+  await page.click("text=Where should I start?");
+  await expect(page.locator(".bubble").last()).toContainText("Simulated coach");
+});
+
+test("task board: drag a card to another column", async ({ page }) => {
+  await page.goto("/teams/team_001");
+  const card = page.locator(".task-card", { hasText: "Design the new flow" });
+  await card.dragTo(page.locator(".column").nth(1));
+  await expect(page.locator(".column").nth(1)).toContainText("Design the new flow");
+});
+
+test("anonymity: mentor sees anonymous names until the learner accepts", async ({ page }) => {
+  await switchUser(page, "Grace Walker (mentor)");
+  await page.goto("/teams/team_001");
+  await expect(page.locator("main")).toContainText("Learner #A3F");
+  await expect(page.locator("main")).not.toContainText("Mia Chen");
+  await page.locator("main li", { hasText: "Learner #A3F" }).locator("text=Interested in their work").click();
+  await page.fill('textarea[aria-label="Note to the learner"]', "Great interview summary.");
+  await page.click("text=Send request");
+  await expect(page.locator("main")).toContainText("Request pending");
+
+  await switchUser(page, "Learner #A3F");
+  await page.goto("/");
+  await page.click("text=Share my name");
+  await expect(page.locator("main")).toContainText("Connected with Grace Walker");
+
+  await switchUser(page, "Grace Walker (mentor)");
+  await page.goto("/teams/team_001");
+  await expect(page.locator("main .card").filter({ hasText: "Team" }).first()).toContainText("Mia Chen");
+  await expect(page.locator("main")).toContainText("Learner #B71"); // Liam stays anonymous
+});
+
+test("mentor creates and edits a project; a learner joins it", async ({ page }) => {
+  await switchUser(page, "Grace Walker (mentor)");
+  await page.goto("/projects/new");
+  await page.fill('input[placeholder^="e.g. Reduce checkout"]', "Improve a bike rental app's booking flow");
+  await page.fill(
+    'textarea[placeholder^="Describe a realistic"]',
+    "Riders give up when booking a bike because the map is confusing. Research why and redesign the booking flow."
+  );
+  await page.click("text=Draft criteria and tasks with AI");
+  await expect(page.locator('input[aria-label="Criterion 4 name"]')).toBeVisible();
+  await page.click("text=Publish project");
+  await page.waitForURL(/\/projects\/project_/);
+  const projectUrl = page.url();
+
+  await page.click("text=Edit project");
+  await page.fill('input[placeholder^="e.g. Reduce checkout"]', "Improve a bike rental app's booking flow (v2)");
+  await page.click("text=+ Add task");
+  await page.fill('input[aria-label="Task 5 title"]', "Redesign the booking screen");
+  await page.fill('textarea[aria-label="Task 5 instructions"]', "Wireframe the new booking screen.");
+  await page.click("text=Save changes");
+  await expect(page.locator("main h1")).toContainText("(v2)");
+
+  await page.click("text=Edit project");
+  await page.click("text=+ Add task");
+  await page.click("text=Save changes");
+  await expect(page.locator("main")).toContainText("Every task needs a title and instructions.");
+
+  await switchUser(page, "Learner #C09");
+  await page.goto(projectUrl);
+  await page.click("text=Join this project");
+  await page.waitForURL(/\/teams\//);
+  await expect(page.locator("main")).toContainText("Redesign the booking screen");
+
+  await switchUser(page, "Daniel Kim (mentor)");
+  await page.goto(projectUrl + "/edit");
+  await expect(page.locator("main")).toContainText("Only the mentor who wrote this project can edit it.");
+});
+
+test("career assessment: saved result, retake, best match and ranked projects", async ({ page }) => {
+  await page.goto("/assessment");
+  await expect(page.locator("main")).toContainText("Your best match");
+  await page.click("main >> text=Retake");
+  const software = ["automates a boring task", "why a program crashes", "small app from scratch"];
+  for (let pageNo = 0; pageNo < 4; pageNo++) {
+    for (const item of await page.locator("fieldset.likert").all()) {
+      const text = await item.locator("legend").innerText();
+      const answer = software.some((s) => text.includes(s))
+        ? "Strongly like"
+        : /hacker|firewall|equipment|research|spreadsheet|energy|carbon/i.test(text)
+          ? "Like"
+          : "Dislike";
+      await item.locator(".likert-option", { hasText: new RegExp(`^${answer}$`) }).click();
+    }
+    await page.click(pageNo < 3 ? "text=Next →" : "text=See my result");
+  }
+  await expect(page.locator("main .career-field")).toContainText("Software Development");
+  await page.goto("/projects");
+  await expect(page.locator(".project-card").first()).toContainText("Software Development");
+});
+
+test("kudos, help requests and the mentor's attention list", async ({ page }) => {
+  await page.goto("/teams/team_001/tasks/task_001");
+  await page.locator("main li", { hasText: "Wrote the interview questions" }).locator("button.kudos").click();
+  await expect(page.locator("main")).toContainText("Thanked");
+
+  await switchUser(page, "Grace Walker (mentor)");
+  await page.goto("/");
+  await expect(page.locator("main .badge", { hasText: "Help request" })).toBeVisible();
+  await page.locator("main a", { hasText: "Write the problem statement" }).click();
+  await page.click("text=Mark as answered");
+  await page.goto("/");
+  await expect(page.locator("main")).toContainText("All clear");
+
+  await switchUser(page, "Learner #A3F");
+  await page.goto("/teams/team_001/tasks/task_003");
+  await page.click("text=Ask the mentor");
+  await page.fill('textarea[aria-label="What you need help with"]', "How many screens should the wireframe have?");
+  await page.click("text=Send to mentor");
+  await expect(page.locator("main")).toContainText("Waiting for the mentor");
+});
+
+test("portfolio shows a completed project and achievements", async ({ page }) => {
+  await switchUser(page, "Liam Nguyen");
+  await page.goto("/portfolio/user_002");
+  await expect(page.locator("main")).toContainText("Completed · reviewed by mentor");
+  await expect(page.locator("main")).toContainText("This is work I would be happy");
+  expect(await page.locator(".achievement.earned").count()).toBeGreaterThanOrEqual(4);
+});
+
+test("unknown pages show the not-found page", async ({ page }) => {
+  await page.goto("/no-such-page");
+  await expect(page.locator("main")).toContainText("Page not found");
+});
+
+test("phone width: no sideways scrolling on the main pages", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ["/", "/projects", "/teams/team_001", "/portfolio/user_001", "/assessment", "/about"]) {
+    await page.goto(path);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(391);
+  }
+});

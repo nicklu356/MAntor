@@ -51,11 +51,18 @@ The app **never breaks without a key**. With no `ANTHROPIC_API_KEY` (or if the A
 ## 🧪 Tests
 
 ```bash
-npm test         # unit tests for the logic in lib/
-npm run build    # production build
+npm test                  # unit tests for the logic in lib/ (fast, no setup)
+npm run test:e2e          # end-to-end tests of the demo in a real browser (Playwright)
+npm run test:rules        # Firestore security rules against the Firebase emulators
+npm run test:e2e:firebase # end-to-end tests with real accounts, against the emulators
+npm run build             # production build
 ```
 
-GitHub Actions runs both on every push to `main` and on every pull request.
+* The end-to-end tests build the app into their own folder and switch off any Firebase or AI keys from `.env.local`, so they never touch real data or spend money
+* `test:rules` and `test:e2e:firebase` need the [Firebase CLI](https://firebase.google.com/docs/cli) (`npm install -g firebase-tools`) and Java 11+ for the Firestore emulator. No Firebase project is needed
+* The first time, install the test browser with `npx playwright install chromium`
+
+GitHub Actions runs all of them on every push to `main` and on every pull request (see `.github/workflows/ci.yml`).
 
 ---
 
@@ -262,6 +269,8 @@ lib/
   session.js                       Demo or real accounts
   firebase.js, mockStore.js, config.js
 tests/                             Unit tests for lib/ (npm test)
+e2e/                               Browser tests: demo.spec.mjs (demo), accounts.spec.mjs (accounts, emulators)
+tests/rules/                       Firestore security rules tests (emulators)
 docs/
   execution-plan.md                Problem, user flow, design decisions, MVP
   data-structure.md                Firestore collections and fields

@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import NotificationBell from "./NotificationBell";
 import { APP_NAME } from "@/lib/config";
-import { isFirebaseEnabled } from "@/lib/db";
+import { exitDemo } from "@/lib/session";
 import { useUser } from "./UserProvider";
 
 export default function Header() {
   const pathname = usePathname();
-  const { users, currentUser, isMentor, switchUser, userName, loaded, dataError } = useUser();
+  const { mode, users, currentUser, isMentor, isAdmin, switchUser, userName, loaded, dataError, signedOut } = useUser();
   const learners = users.filter((u) => u.role === "learner");
   const mentors = users.filter((u) => u.role === "mentor");
 
@@ -29,6 +29,7 @@ export default function Header() {
     { href: "/projects", label: "Projects" },
     ...(isMentor ? [{ href: "/projects/new", label: "New project" }] : []),
     ...(!isMentor && currentUser ? [{ href: `/portfolio/${currentUser.id}`, label: "Portfolio" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
   // The most specific matching link is the active one ("/projects/new" beats "/projects").
   const active = nav
@@ -50,21 +51,23 @@ export default function Header() {
           ))}
         </nav>
         <div className="header-right">
+          {mode === "demo" && (
+            <span className="badge badge-amber" title="Sample data in this browser only">
+              Demo
+            </span>
+          )}
           {isMentor && (
             <span className="badge badge-blue" title="Learners appear by anonymous name until they choose to share it">
               Mentor view
             </span>
           )}
-          {ai !== null && (
-            <span className={ai ? "badge badge-green" : "badge badge-amber"}>
-              {ai ? "AI: Live" : "AI: Simulated"}
-            </span>
-          )}
-          <span className={isFirebaseEnabled ? "badge badge-green" : "badge badge-amber"}>
-            {isFirebaseEnabled ? "Firebase" : "Demo data"}
-          </span>
-          <NotificationBell />
-          {users.length > 0 && (
+          {/* Only worth showing when AI answers are simulated (no API key on the server). */}
+          {ai === false && <span className="badge badge-amber">AI: Simulated</span>}
+          {mode === "local" && <span className="badge badge-amber">Demo data</span>}
+          {currentUser && <NotificationBell />}
+
+          {/* Demo: pick which sample person you are. Mentors see anonymous names here too. */}
+          {mode !== "auth" && users.length > 0 && (
             <label className="user-switch">
               <span className="muted small viewing-as">Viewing as</span>
               <select
@@ -72,7 +75,6 @@ export default function Header() {
                 onChange={(e) => switchUser(e.target.value)}
                 aria-label="Switch demo user"
               >
-                {/* In mentor view even this demo switch goes through userName(), so no hidden name is on screen. */}
                 <optgroup label="Learners">
                   {learners.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -90,6 +92,31 @@ export default function Header() {
               </select>
             </label>
           )}
+          {mode === "demo" && (
+            <button className="btn btn-ghost btn-small" onClick={exitDemo}>
+              Exit demo
+            </button>
+          )}
+
+          {/* Real accounts */}
+          {mode === "auth" && currentUser && (
+            <Link href="/account" className="account-chip" title="Your account">
+              <span className="account-avatar" aria-hidden="true">
+                {(currentUser.name || "?").trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="account-name">{currentUser.name}</span>
+            </Link>
+          )}
+          {signedOut && (
+            <>
+              <Link href="/login" className="btn btn-ghost btn-small">
+                Log in
+              </Link>
+              <Link href="/signup" className="btn btn-small">
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
       </div>
       {pathname !== "/setup" && dataError && (
@@ -99,7 +126,7 @@ export default function Header() {
           </div>
         </div>
       )}
-      {pathname !== "/setup" && !dataError && loaded && users.length === 0 && (
+      {pathname !== "/setup" && mode !== "auth" && !dataError && loaded && users.length === 0 && (
         <div className="data-banner" role="status">
           <div className="container">
             <strong>The database is empty.</strong> <Link href="/setup">Load the demo data on the setup page →</Link>

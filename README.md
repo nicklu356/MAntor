@@ -34,7 +34,8 @@ Students and career changers need hands-on experience, but online learning rarel
 | Kudos between teammates, and achievements on the portfolio | ✅ Built |
 | Drag-and-drop task board, project search and filters, toasts, 404 and error pages | ✅ Built |
 | Unit tests (`npm test`) and GitHub Actions CI (test + build) | ✅ Built |
-| Login | 🎭 Simulated ("Viewing as" switch in the header) |
+| Real accounts (email + password, Google), private profiles, admin-approved mentors, strict Firestore rules | ✅ Built (Firebase Authentication) |
+| Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 
 ### 🔌 What happens without an API key
 
@@ -109,13 +110,17 @@ The app works straight away in **demo mode**: data is saved in your browser, and
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### Firebase (shared database)
+### Firebase (shared database and accounts)
 
-Demo mode saves data only in each visitor's own browser, so a project a mentor publishes is invisible to everyone else. Firebase fixes that: everyone shares one database.
+Without Firebase the app runs as a demo: data stays in each visitor's own browser. With Firebase, people sign up, and everyone shares one database.
+
+**1. Create the project**
 
 1. Go to https://console.firebase.google.com, click **Create a project** (Google Analytics is not needed)
-2. **Build > Firestore Database > Create database**. Pick a location close to your users (for Melbourne: `australia-southeast2`), then choose **Start in test mode**
-3. **Project settings (⚙️) > General > Your apps > Web (</>)**, register the app (no Hosting needed) and copy the `firebaseConfig` values into `.env.local`:
+2. **Build > Firestore Database > Create database**. Pick a location close to your users (for Melbourne: `australia-southeast2`)
+3. **Build > Authentication > Get started**, then under **Sign-in method** enable **Email/Password** and **Google**
+4. **Authentication > Settings > Authorized domains**: add your Vercel domain (for example `your-app.vercel.app`). Google sign-in fails on domains that are not listed
+5. **Project settings (⚙️) > General > Your apps > Web (</>)**, register the app (no Hosting needed) and copy the `firebaseConfig` values into `.env.local` (just the value: no quotes, no commas):
 
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=...
@@ -126,14 +131,23 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-4. Restart the app (`Ctrl + C`, then `npm run dev`). The header badge now says **Firebase**
-5. Open http://localhost:3000/setup and click **Load demo data into Firebase** (run it again any time to reset the demo records)
+On Vercel, add the same six values under **Settings > Environment Variables** for **Production and Preview**, then **redeploy**: `NEXT_PUBLIC_` values are built into the app, so they only apply to a new deployment. Vercel warns that `NEXT_PUBLIC_` values are visible in the browser: that is expected for Firebase web config, so click **Change to Config**. Never put `ANTHROPIC_API_KEY` behind a `NEXT_PUBLIC_` name.
 
-On Vercel, add the same six values under **Settings > Environment Variables**, then **redeploy**: `NEXT_PUBLIC_` values are built into the app, so they only apply to a new deployment.
+**2. Publish the security rules**
 
-⚠️ **Rules:** test mode lets anyone read and write, and it stops working after 30 days. To keep the prototype running, paste `firestore.rules` from this repo into **Firestore > Rules** and publish (it allows access until 31 Dec 2030). Before real users sign up, replace it with rules based on Firebase Auth.
+Paste `firestore.rules` from this repo into **Firestore Database > Rules** and click **Publish**. They check every read and write against the signed-in user (details are in the file). Publish them after the app version with accounts is deployed: older versions of the app have no sign-in and would be locked out.
 
-🧪 **Test without a real project:** the Firestore emulator works too. Install the Firebase CLI, run `firebase emulators:start --only firestore --project demo-mantor`, and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor` and `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` in `.env.local`.
+**3. Make yourself an admin and add projects**
+
+1. Open the app and sign up
+2. In the Firebase console open **Firestore Database > Data > users**, find the document whose id is your user id (shown in **Authentication > Users**), and add a field `admin` of type **boolean** set to `true`. Nobody can give themselves this field from the app
+3. Reload the app: an **Admin** link appears. There you can **Load sample projects**, approve **mentor applications** (people apply from their Account page), and **Remove old demo records** if you loaded the old demo data into this database before
+
+**What stays private:** a learner's real name and email are in `profiles/{uid}` (only they can read it). Teammates see each other's names through `teamNames/{teamId}` (members only). Mentors see anonymous names until a learner accepts their connection request.
+
+**Known limits:** AI feedback is saved by the learner's browser, so a determined learner could save made-up scores for their own team (moving that save to the server with the Firebase Admin SDK fixes it). Portfolios are only visible to signed-in users.
+
+🧪 **Test without a real project:** the Firebase emulators work too. Install the Firebase CLI, run `firebase emulators:start --only firestore,auth --project demo-mantor` (with `firestore.rules` set as the rules file in `firebase.json`), and use `NEXT_PUBLIC_FIREBASE_API_KEY=demo`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-mantor`, `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` and `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` in `.env.local`.
 
 ---
 
@@ -148,7 +162,7 @@ On Vercel, add the same six values under **Settings > Environment Variables**, t
 
 ## 🎬 Demo script
 
-Before a pitch, open `/setup` and click **Reset demo data** so the demo starts clean. Check the header badge says **AI: Live** (real key set).
+The script uses the demo (sample learners and mentors). On a site with Firebase, click **Try the demo** on the home page first; without Firebase the app is always the demo. Before a pitch, open `/setup` and click **Reset demo data** so the demo starts clean. Check the header has no **AI: Simulated** badge (real key set).
 
 1. **Assessment:** as *Mia Chen*, open **Assessment**: her saved result shows (best match, every field's % fit, interest profile). Click **Retake** and rate the 32 activities (8 per page; progress is saved if you leave)
 2. **Projects:** projects are ranked by % fit, with a *Best match* badge
@@ -178,7 +192,9 @@ app/
   portfolio/[id]/page.js           Learner portfolio (shareable, printable)
   teams/[id]/page.js               Task board, progress, personal analysis, mentor final feedback
   teams/[id]/tasks/[taskId]/page.js  Task: submission, contributions, AI feedback, discussion
-  setup/page.js                    Load demo data into Firebase / reset demo mode
+  setup/page.js                    Check the database connection / reset the demo data
+  login, signup, account           Sign in (email or Google), sign up, your account and mentor application
+  admin/page.js                    Admin: approve mentors, load sample projects, remove old demo records
   api/feedback/route.js            AI task feedback (server, keeps the key secret)
   api/analysis/route.js            AI personal analysis + course picks
   api/assessment/route.js          AI "why this field fits you" text
@@ -187,7 +203,8 @@ app/
   api/status/route.js              Tells the header if AI is live or simulated
 components/
   Header.js                        Menu, AI/mode badges, "Viewing as" switch (learners and mentors)
-  UserProvider.js                  Current demo user; userName() hides learner names from mentors
+  UserProvider.js                  Who is using the app (demo switch or signed-in account); userName() decides which name each viewer may see
+  AuthGate.js, AuthForm.js         Pages that need an account; the log in / sign up form
   ContributionForm.js              Contribution form
   FeedbackPanel.js                 AI feedback with score changes and history
   ProgressPanel.js                 Tasks done + score history per criterion
@@ -214,6 +231,8 @@ lib/
   projectDraft.js                  Cleans the project form; normalises the AI draft
   format.js                        timeAgo and other display helpers
   server/ai.js                     Shared AI helpers: fallback checks, rate limit, size limits
+  auth.js                          Firebase Authentication (email, Google, password reset)
+  session.js                       Demo or real accounts
   firebase.js, mockStore.js, config.js
 tests/                             Unit tests for lib/ (npm test)
 docs/

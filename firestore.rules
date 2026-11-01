@@ -1,11 +1,154 @@
 rules_version = '2';
 
-// Prototype rules: anyone can read and write until the date below, like Firebase's "test mode".
-// Replace these with real rules (based on Firebase Auth) before real users sign up.
+// MAntor security rules for real accounts (Firebase Authentication).
+// Publish them in the Firebase console: Firestore Database > Rules > paste > Publish.
+//
+// Who can do what:
+// - Anyone can read projects and mentors' public profiles (the public project catalogue).
+// - Signed-in users can read the rest of the shared work (teams, tasks, feedback, comments...).
+// - Learners' real names are never in a shared record: they live in profiles/{uid} (owner only)
+//   and teamNames/{teamId} (that team's members only). Mentors see anonymous names.
+// - Only an admin can make someone a mentor. Admins have `admin: true` on their users record,
+//   which only the Firebase console (or another admin) can set.
+//
+// Known limit: AI feedback is saved by the learner's browser, so a determined learner could save
+// made-up scores for their own team. Moving that save into the server (Admin SDK) would close it.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2030, 12, 31);
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function path(collectionName, id) { return /databases/$(database)/documents/$(collectionName)/$(id); }
+    function me() { return get(path("users", uid())).data; }
+    function isAdmin() { return signedIn() && exists(path("users", uid())) && me().get("admin", false) == true; }
+    function isMentorRole() { return signedIn() && exists(path("users", uid())) && me().role == "mentor"; }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function changes(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+    function team(teamId) { return get(path("teams", teamId)).data; }
+    function isTeamMember(teamId) { return signedIn() && uid() in team(teamId).memberIds; }
+    function isProjectMentor(projectId) { return signedIn() && get(path("projects", projectId)).data.mentorId == uid(); }
+    function isTeamMentor(teamId) { return isProjectMentor(team(teamId).projectId); }
+
+    // Public profile: role, anonymous name, assessment result. Mentors also have a public name.
+    match /users/{userId} {
+      allow read: if signedIn() || resource.data.role == "mentor";
+      allow create: if (signedIn() && userId == uid()
+          && request.resource.data.role == "learner"
+          && request.resource.data.keys().hasOnly(["role", "anonymousName", "createdAt"]))
+        || isAdmin();
+      // You can update your own record, but never your role or admin flag, and a learner cannot
+      // give themselves a public name (that would break anonymity).
+      allow update: if (signedIn() && userId == uid()
+          && !changes(["role", "admin"])
+          && (resource.data.role == "mentor" || !changes(["name", "company"])))
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Private: real name and email. Only the owner.
+    match /profiles/{userId} {
+      allow read, write: if signedIn() && userId == uid();
+    }
+
+    // Real names inside one team: { uid: name }. Each member can only write their own entry.
+    match /teamNames/{teamId} {
+      allow read: if isTeamMember(teamId);
+      allow create: if isTeamMember(teamId) && request.resource.data.keys().hasOnly([uid()]);
+      allow update: if isTeamMember(teamId) && changedOnly([uid()]);
+      allow delete: if isAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create: if (isMentorRole() && request.resource.data.mentorId == uid()) || isAdmin();
+      allow update: if (signedIn() && resource.data.mentorId == uid() && request.resource.data.mentorId == uid()) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if signedIn();
+      // Start a new team with yourself as the only member.
+      allow create: if signedIn()
+        && request.resource.data.memberIds == [uid()]
+        && request.resource.data.status == "active"
+        && exists(path("projects", request.resource.data.projectId));
+      allow update: if signedIn() && (
+          // Join an active team that has space.
+          (changedOnly(["memberIds"])
+            && resource.data.status == "active"
+            && !(uid() in resource.data.memberIds)
+            && request.resource.data.memberIds == resource.data.memberIds.concat([uid()])
+            && request.resource.data.memberIds.size() <= get(path("projects", resource.data.projectId)).data.teamSize)
+          // Leave an active team (the last one out disbands it).
+          || (changedOnly(["memberIds", "status"])
+            && resource.data.status == "active"
+            && uid() in resource.data.memberIds
+            && request.resource.data.memberIds == resource.data.memberIds.removeAll([uid()])
+            && (request.resource.data.status == "active"
+              || (request.resource.data.status == "disbanded" && request.resource.data.memberIds.size() == 0)))
+          // The project's mentor marks the team completed.
+          || (changedOnly(["status"]) && request.resource.data.status == "completed" && isProjectMentor(resource.data.projectId))
+          || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if isTeamMember(request.resource.data.teamId);
+      allow update: if (isTeamMember(resource.data.teamId)
+          && !changes(["teamId", "projectId", "criteriaIds", "title", "description"]))
+        // The mentor answers a help request.
+        || (changedOnly(["helpRequest"]) && isTeamMentor(resource.data.teamId))
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /contributions/{contributionId} {
+      allow read: if signedIn();
+      allow create: if isTeamMember(request.resource.data.teamId) && request.resource.data.userId == uid();
+      // Teammates can thank a contribution; nobody can thank their own.
+      allow update: if (changedOnly(["kudos"]) && resource.data.userId != uid() && isTeamMember(resource.data.teamId))
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if signedIn();
+      allow create: if (request.resource.data.kind == "task"
+          && request.resource.data.source == "ai"
+          && request.resource.data.requestedBy == uid()
+          && isTeamMember(request.resource.data.teamId))
+        || (request.resource.data.kind == "final"
+          && request.resource.data.source == "mentor"
+          && request.resource.data.authorId == uid()
+          && isTeamMentor(request.resource.data.teamId));
+      allow update, delete: if isAdmin();
+    }
+
+    match /comments/{commentId} {
+      allow read: if signedIn();
+      allow create: if request.resource.data.userId == uid()
+        && (isTeamMember(request.resource.data.teamId) || isTeamMentor(request.resource.data.teamId));
+      allow update, delete: if isAdmin();
+    }
+
+    // Personal analyses: only the learner they belong to.
+    match /analyses/{analysisId} {
+      allow read: if signedIn() && resource.data.userId == uid();
+      allow create: if signedIn() && request.resource.data.userId == uid() && isTeamMember(request.resource.data.teamId);
+      allow delete: if isAdmin();
+    }
+
+    // A mentor asks to learn who did the work; only the learner can accept.
+    match /connections/{connectionId} {
+      allow read: if signedIn() && (resource.data.mentorId == uid() || resource.data.learnerId == uid());
+      allow create: if signedIn()
+        && request.resource.data.mentorId == uid()
+        && request.resource.data.status == "pending"
+        && isTeamMentor(request.resource.data.teamId)
+        && request.resource.data.learnerId in team(request.resource.data.teamId).memberIds;
+      allow update: if signedIn() && resource.data.learnerId == uid() && changedOnly(["status", "respondedAt", "learnerName"]);
+      allow delete: if isAdmin();
     }
   }
 }

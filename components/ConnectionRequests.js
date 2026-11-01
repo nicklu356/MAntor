@@ -9,7 +9,7 @@ import { respondToConnection } from "@/lib/db";
 
 export default function ConnectionRequests() {
   const toast = useToast();
-  const { users, connections, refreshConnections } = useUser();
+  const { users, connections, refreshConnections, currentUser } = useUser();
   const [busy, setBusy] = useState(null);
   const pending = connections.filter((c) => c.status === "pending");
   const accepted = connections.filter((c) => c.status === "accepted");
@@ -20,7 +20,8 @@ export default function ConnectionRequests() {
   async function respond(c, accept) {
     setBusy(c.id);
     try {
-      await respondToConnection(c.id, accept);
+      // Accepting shares the learner's own name with this mentor only.
+      await respondToConnection(c.id, accept, currentUser?.name);
       await refreshConnections();
       toast(accept ? `${mentor(c.mentorId)?.name} can now see your name` : "Request declined. You stay anonymous.");
     } catch (e) {

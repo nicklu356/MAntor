@@ -19,6 +19,7 @@ import {
   getConnectionsForMentor,
   getProfile,
   getTeamNames,
+  getTeamPhotos,
   getTeamsForUser,
   getUsers,
 } from "@/lib/db";
@@ -38,6 +39,7 @@ export function UserProvider({ children }) {
   const [authInfo, setAuthInfo] = useState(null);
   const [connections, setConnections] = useState([]);
   const [teamNames, setTeamNames] = useState({}); // real accounts: { uid: name } of my teammates
+  const [teamPhotos, setTeamPhotos] = useState({}); // real accounts: { uid: photo } of my teammates
   // loaded: we know who is using the app (or that nobody is signed in).
   // dataError: the database could not be read (shown in the header).
   const [loaded, setLoaded] = useState(false);
@@ -125,6 +127,7 @@ export function UserProvider({ children }) {
       ...userRecord,
       name: userRecord.role === "mentor" ? userRecord.name || profile?.name : profile?.name || userRecord.anonymousName,
       email: profile?.email || "",
+      photo: profile?.photo || null,
     };
   }, [userRecord, profile, mode]);
   const isMentor = currentUser?.role === "mentor";
@@ -154,8 +157,12 @@ export function UserProvider({ children }) {
     if (mode !== "auth" || !currentUser || isMentor) return;
     let cancelled = false;
     getTeamsForUser(currentUser.id)
-      .then((teams) => Promise.all(teams.map((t) => getTeamNames(t.id))))
-      .then((groups) => !cancelled && setTeamNames(Object.assign({}, ...groups)))
+      .then((teams) => Promise.all(teams.map(async (t) => [await getTeamNames(t.id), await getTeamPhotos(t.id)])))
+      .then((groups) => {
+        if (cancelled) return;
+        setTeamNames(Object.assign({}, ...groups.map((g) => g[0])));
+        setTeamPhotos(Object.assign({}, ...groups.map((g) => g[1])));
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -177,6 +184,11 @@ export function UserProvider({ children }) {
     for (const c of connections) if (c.status === "accepted") map.set(c.learnerId, c.learnerName || null);
     return map;
   }, [connections]);
+  const revealedPhotos = useMemo(() => {
+    const map = new Map();
+    for (const c of connections) if (c.status === "accepted" && c.learnerPhoto) map.set(c.learnerId, c.learnerPhoto);
+    return map;
+  }, [connections]);
 
   const userName = useCallback(
     (id) => {
@@ -189,6 +201,18 @@ export function UserProvider({ children }) {
       return user.name || teamNames[id] || user.anonymousName;
     },
     [users, currentUser, isMentor, revealed, teamNames]
+  );
+
+  // A person's photo, with the same privacy as their name (null = show initials).
+  const userPhoto = useCallback(
+    (id) => {
+      const user = users.find((u) => u.id === id);
+      if (!user) return null;
+      if (currentUser && id === currentUser.id) return currentUser.photo || null;
+      if (isMentor && user.role === "learner") return revealedPhotos.get(id) || null;
+      return user.photo || teamPhotos[id] || null;
+    },
+    [users, currentUser, isMentor, revealedPhotos, teamPhotos]
   );
 
   const signOut = useCallback(async () => {
@@ -206,6 +230,7 @@ export function UserProvider({ children }) {
         isAdmin: Boolean(currentUser?.admin),
         switchUser,
         userName,
+        userPhoto,
         refreshUsers,
         connections,
         refreshConnections,

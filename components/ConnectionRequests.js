@@ -21,7 +21,7 @@ export default function ConnectionRequests() {
     setBusy(c.id);
     try {
       // Accepting shares the learner's own name with this mentor only.
-      await respondToConnection(c.id, accept, currentUser?.name);
+      await respondToConnection(c.id, accept, currentUser?.name, currentUser?.photo);
       await refreshConnections();
       toast(accept ? `${mentor(c.mentorId)?.name} can now see your name` : "Request declined. You stay anonymous.");
     } catch (e) {

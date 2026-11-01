@@ -3,6 +3,8 @@
 // Shows AI feedback for a task and lets the team request new feedback.
 // When there is more than one review, each score shows the change since the previous review.
 import { useCallback, useEffect, useState } from "react";
+import { useUser } from "@/components/UserProvider";
+import { currentAuthUser } from "@/lib/auth";
 import { addFeedback, getFeedback } from "@/lib/db";
 
 export function ScoreDots({ score }) {
@@ -31,11 +33,17 @@ export function ReviewBadges({ review }) {
       <span className="badge badge-blue">{review.source === "ai" ? "AI feedback" : "Mentor feedback"}</span>
       {review.sample && <span className="badge badge-amber">Example</span>}
       {review.simulated && <span className="badge badge-amber">Simulated</span>}
+      {review.verified && (
+        <span className="badge badge-green" title="Scored and saved by the server, so it cannot be edited by learners">
+          ✓ Verified
+        </span>
+      )}
     </>
   );
 }
 
 export default function FeedbackPanel({ project, task, teamId, contributions, canRequest, userId }) {
+  const { mode } = useUser();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,14 +61,17 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
     setLoading(true);
     setError("");
     try {
+      // Real accounts send their login token, so the server can score and save the review itself.
+      const token = mode === "auth" ? await currentAuthUser()?.getIdToken() : null;
       const res = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project, task, submission: task.submission, contributions }),
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ taskId: task.id, project, task, submission: task.submission, contributions }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
-      await addFeedback({
+      // Without a server key the browser saves it (unverified).
+      if (!data.saved) await addFeedback({
         taskId: task.id,
         teamId,
         source: "ai",

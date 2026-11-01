@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "./UserProvider";
+import { adElementIsHidden } from "@/lib/adblock";
 import {
   explainAuthError,
+  explainGoogleError,
   googleSignInProblem,
   logInWithEmail,
   prepareGoogleSignIn,
@@ -29,13 +31,19 @@ export default function AuthForm({ kind }) {
   const [notice, setNotice] = useState("");
   const [next, setNext] = useState("/");
   const [googleProblem, setGoogleProblem] = useState("");
+  const [adBlocker, setAdBlocker] = useState(false);
+  const [googleError, setGoogleError] = useState(""); // shown under the Google button
   const signingUp = kind === "signup";
 
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get("next")));
     const problem = googleSignInProblem();
     setGoogleProblem(problem);
-    if (!problem && mode === "auth") prepareGoogleSignIn();
+    if (!problem && mode === "auth") {
+      prepareGoogleSignIn();
+      // Warn before the click if an ad blocker is hiding ad-like elements on this page.
+      adElementIsHidden().then(setAdBlocker);
+    }
   }, [mode]);
 
   // Already signed in (or just signed in): go on.
@@ -56,14 +64,17 @@ export default function AuthForm({ kind }) {
     );
   }
 
-  async function run(action) {
+  async function run(action, { google = false } = {}) {
+    const startedAt = Date.now();
     setBusy(true);
     setError("");
+    setGoogleError("");
     setNotice("");
     try {
       await action();
     } catch (e) {
-      setError(explainAuthError(e));
+      if (google) setGoogleError(await explainGoogleError(e, startedAt));
+      else setError(explainAuthError(e));
     }
     setBusy(false);
   }
@@ -95,7 +106,7 @@ export default function AuthForm({ kind }) {
       <button
         type="button"
         className="btn btn-secondary google"
-        onClick={() => run(logInWithGoogle)}
+        onClick={() => run(logInWithGoogle, { google: true })}
         disabled={busy || Boolean(googleProblem)}
       >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -107,6 +118,16 @@ export default function AuthForm({ kind }) {
         Continue with Google
       </button>
       {googleProblem && <p className="error small">{googleProblem}</p>}
+      {googleError && (
+        <p className="error small" role="alert">
+          {googleError}
+        </p>
+      )}
+      {!googleProblem && !googleError && adBlocker && (
+        <p className="notice small" role="status">
+          An ad blocker seems to be on. If the Google window does not open, pause it for this site and reload.
+        </p>
+      )}
 
       <div className="divider">
         <span>or with email</span>

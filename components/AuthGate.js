@@ -5,6 +5,7 @@
 // Signed-in users who have not filled in their basic details are asked for them first.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import PhotoPicker from "./PhotoPicker";
 import ProfileForm from "./ProfileForm";
 import { useUser } from "./UserProvider";
 import { startDemo } from "@/lib/session";
@@ -15,6 +16,7 @@ const isPublic = (path) =>
   path === "/login" ||
   path === "/signup" ||
   path === "/projects" ||
+  path.startsWith("/p/") ||
   (/^\/projects\/[^/]+$/.test(path) && path !== "/projects/new");
 
 export default function AuthGate({ children }) {
@@ -22,7 +24,7 @@ export default function AuthGate({ children }) {
   const { signedOut, currentUser, profileComplete } = useUser();
 
   // New accounts (and older ones missing details) complete their profile before anything else.
-  if (currentUser && !profileComplete && pathname !== "/about") {
+  if (currentUser && !profileComplete && pathname !== "/about" && !pathname.startsWith("/p/")) {
     return (
       <div className="card stack" style={{ maxWidth: 760 }}>
         <div>
@@ -33,6 +35,7 @@ export default function AuthGate({ children }) {
             Account page.
           </p>
         </div>
+        <PhotoPicker />
         <ProfileForm submitLabel="Save and continue" />
       </div>
     );

@@ -31,6 +31,8 @@ test("projects: search, field filter from a link, ranked by fit", async ({ page 
 test("task: update submission, get feedback, ask the AI coach", async ({ page }) => {
   await page.goto("/teams/team_001/tasks/task_001");
   const box = page.locator('textarea[aria-label="Submission"]');
+  await expect(box).toHaveValue(/interview/i); // the saved submission is loaded for editing
+  await expect(page.locator("main")).not.toContainText("A teammate saved a newer version");
   await box.fill((await box.inputValue()) + " Key needs: clear progress, fewer password rules.");
   await page.click("text=Update submission");
   await expect(page.locator(".toast")).toContainText("Submission updated");
@@ -182,4 +184,32 @@ test("phone width: no sideways scrolling on the main pages", async ({ page }) =>
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(391);
   }
+});
+
+test("language: switch to Traditional Chinese and back, and the choice is remembered", async ({ page }) => {
+  await page.click(".lang-switch");
+  await expect(page.locator("main")).toContainText("嗨，Mia");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW");
+  await page.goto("/projects");
+  await expect(page.locator("main h1")).toContainText("專案");
+  await expect(page.locator(".project-card").first()).toContainText("UX 設計");
+  await page.reload();
+  await expect(page.locator("main h1")).toContainText("專案");
+  await page.click(".lang-switch");
+  await expect(page.locator("main h1")).toContainText("Projects");
+});
+
+test("language: a Chinese browser gets Chinese pages, rendered on the server too", async ({ browser }) => {
+  const context = await browser.newContext({ locale: "zh-TW" });
+  const page = await context.newPage();
+  const response = await page.goto("/about");
+  expect(await response.text()).toContain("為什麼重要"); // server-rendered HTML, before any script runs
+  await expect(page.locator("footer")).toContainText("隱私權與使用條款");
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ["/", "/projects", "/assessment"]) {
+    await page.goto(path);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(391);
+  }
+  await context.close();
 });

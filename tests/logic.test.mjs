@@ -243,3 +243,70 @@ test("profile details: names, age limit and education", async () => {
   assert.equal(cleanProfile(ok).name, "Ada King");
   assert.equal(cleanProfile({ ...ok, graduationYear: "" }).graduationYear, null);
 });
+
+// ---- Language ----
+import zhTW from "../lib/i18n/zh-TW.js";
+import { pickLocale, translate, translator } from "../lib/i18n/index.js";
+
+test("translate: Chinese text with placeholders, English fallback for unknown text", () => {
+  assert.equal(translate("zh-TW", "Hi {name}", { name: "Mia" }), "嗨，Mia");
+  assert.equal(translate("en", "Hi {name}", { name: "Mia" }), "Hi Mia");
+  assert.equal(translate("zh-TW", "Text nobody translated"), "Text nobody translated");
+  assert.equal(translator("zh-TW")("{n} min ago", { n: 5 }), "5 分鐘前");
+  assert.equal(timeAgo(new Date(Date.now() - 5 * 60_000).toISOString(), Date.now(), translator("zh-TW")), "5 分鐘前");
+});
+
+test("pickLocale: the saved choice wins, then the browser language", () => {
+  assert.equal(pickLocale("en", "zh-TW,zh;q=0.9"), "en");
+  assert.equal(pickLocale(undefined, "zh-TW,zh;q=0.9"), "zh-TW");
+  assert.equal(pickLocale("fr", "en-US,en;q=0.9"), "en");
+  assert.equal(pickLocale(undefined, ""), "en");
+});
+
+test("zh-TW dictionary keeps every placeholder of its English key", () => {
+  const placeholders = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+  for (const [english, chinese] of Object.entries(zhTW)) {
+    assert.ok(chinese.trim(), `empty translation for "${english}"`);
+    assert.equal(placeholders(chinese), placeholders(english), `placeholders differ for "${english}"`);
+  }
+});
+
+test("every field, interest type and assessment activity has a translation", () => {
+  const missing = [];
+  for (const field of FIELDS) {
+    const info = FIELD_INFO[field];
+    for (const text of [field, info.blurb, info.summary, ...info.dayToDay, ...info.roles, ...info.skills]) {
+      if (!(text in zhTW)) missing.push(text);
+    }
+  }
+  for (const item of ITEMS) if (!(item.text in zhTW)) missing.push(item.text);
+  assert.deepEqual(missing, []);
+});
+
+test("every text the code passes to t() has a Traditional Chinese translation", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = new URL("..", import.meta.url).pathname;
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (path.endsWith(".js") && !path.includes("i18n")) files.push(path);
+    }
+  };
+  ["app", "components", "lib"].forEach((dir) => walk(join(root, dir)));
+  const literal = String.raw`("(?:[^"\\\n]|\\.)*")`;
+  const direct = new RegExp(String.raw`\bt\(\s*` + literal, "g"); // t("text")
+  const choice = new RegExp(String.raw`\bt\([^"\n()]*(?:\([^()]*\))?[^"\n()]*\?\s*` + literal + String.raw`\s*:\s*` + literal, "g"); // t(n > 1 ? "a" : "b")
+  const missing = new Set();
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of [...source.matchAll(direct), ...source.matchAll(choice)]) {
+      for (const text of match.slice(1).filter(Boolean).map((s) => JSON.parse(s))) {
+        if (!(text in zhTW)) missing.add(`${file.slice(root.length)}: ${text}`);
+      }
+    }
+  }
+  assert.deepEqual([...missing], []);
+});

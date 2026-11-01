@@ -17,11 +17,13 @@ import {
   signUpWithEmail,
 } from "@/lib/auth";
 import { startDemo } from "@/lib/session";
+import { useT } from "./LocaleProvider";
 
 // Only go back to a page inside this site.
 const safeNext = (value) => (value && value.startsWith("/") && !value.startsWith("//") ? value : "/");
 
 export default function AuthForm({ kind }) {
+  const t = useT();
   const router = useRouter();
   const { mode, currentUser } = useUser();
   const [email, setEmail] = useState("");
@@ -37,14 +39,14 @@ export default function AuthForm({ kind }) {
 
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get("next")));
-    const problem = googleSignInProblem();
+    const problem = googleSignInProblem(t);
     setGoogleProblem(problem);
     if (!problem && mode === "auth") {
       prepareGoogleSignIn();
       // Warn before the click if an ad blocker is hiding ad-like elements on this page.
       adElementIsHidden().then(setAdBlocker);
     }
-  }, [mode]);
+  }, [mode, t]);
 
   // Already signed in (or just signed in): go on.
   useEffect(() => {
@@ -54,11 +56,11 @@ export default function AuthForm({ kind }) {
   if (mode && mode !== "auth") {
     return (
       <div className="card stack" style={{ maxWidth: 480 }}>
-        <h1>{signingUp ? "Sign up" : "Log in"}</h1>
+        <h1>{signingUp ? t("Sign up") : t("Log in")}</h1>
         <p className="muted">
           {mode === "demo"
-            ? "You are in the demo. Leave the demo to log in with a real account."
-            : "Accounts need Firebase. This copy of the app runs in demo mode (see README)."}
+            ? t("You are in the demo. Leave the demo to log in with a real account.")
+            : t("Accounts need Firebase. This copy of the app runs in demo mode (see README).")}
         </p>
       </div>
     );
@@ -73,8 +75,8 @@ export default function AuthForm({ kind }) {
     try {
       await action();
     } catch (e) {
-      if (google) setGoogleError(await explainGoogleError(e, startedAt));
-      else setError(explainAuthError(e));
+      if (google) setGoogleError(await explainGoogleError(e, startedAt, t));
+      else setError(explainAuthError(e, t));
     }
     setBusy(false);
   }
@@ -85,21 +87,23 @@ export default function AuthForm({ kind }) {
   }
 
   function forgot() {
-    if (!email.trim()) return setError("Type your email first, then click “Forgot password?”.");
+    if (!email.trim()) return setError(t("Type your email first, then click “Forgot password?”."));
     run(async () => {
       await resetPassword(email);
-      setNotice("If an account exists for this email, a reset link is on its way.");
+      setNotice(t("If an account exists for this email, a reset link is on its way."));
     });
   }
 
   return (
     <div className="card stack auth-card">
       <div>
-        <h1>{signingUp ? "Create your account" : "Welcome back"}</h1>
+        <h1>{signingUp ? t("Create your account") : t("Welcome back")}</h1>
         <p className="muted">
           {signingUp
-            ? "Join a team, build real projects, and get feedback against industry standards. Next, you add a few basic details."
-            : "Log in to continue your projects."}
+            ? t(
+                "Join a team, build real projects, and get feedback against industry standards. Next, you add a few basic details."
+              )
+            : t("Log in to continue your projects.")}
         </p>
       </div>
 
@@ -115,7 +119,7 @@ export default function AuthForm({ kind }) {
           <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1Z" />
           <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1A7.2 7.2 0 0 1 12 4.8Z" />
         </svg>
-        Continue with Google
+        {t("Continue with Google")}
       </button>
       {googleProblem && <p className="error small">{googleProblem}</p>}
       {googleError && (
@@ -125,21 +129,21 @@ export default function AuthForm({ kind }) {
       )}
       {!googleProblem && !googleError && adBlocker && (
         <p className="notice small" role="status">
-          An ad blocker seems to be on. If the Google window does not open, pause it for this site and reload.
+          {t("An ad blocker seems to be on. If the Google window does not open, pause it for this site and reload.")}
         </p>
       )}
 
       <div className="divider">
-        <span>or with email</span>
+        <span>{t("or with email")}</span>
       </div>
 
       <form onSubmit={submit} className="stack">
         <label className="field">
-          Email
+          {t("Email")}
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
         </label>
         <label className="field">
-          Password
+          {t("Password")}
           <input
             type="password"
             value={password}
@@ -148,42 +152,43 @@ export default function AuthForm({ kind }) {
             minLength={6}
             required
           />
-          {signingUp && <span className="muted small">At least 6 characters.</span>}
+          {signingUp && <span className="muted small">{t("At least 6 characters.")}</span>}
         </label>
         {error && <p className="error">{error}</p>}
         {notice && <p className="small">{notice}</p>}
         <button className="btn" disabled={busy}>
-          {busy ? "Please wait…" : signingUp ? "Create account" : "Log in"}
+          {busy ? t("Please wait…") : signingUp ? t("Create account") : t("Log in")}
         </button>
       </form>
 
       {signingUp && (
         <p className="muted small">
-          By creating an account you agree to the <Link href="/privacy">privacy policy and terms</Link>.
+          {t("By creating an account you agree to the")} <Link href="/privacy">{t("privacy policy and terms")}</Link>
+          {t(".")}
         </p>
       )}
       <div className="spread small">
         {signingUp ? (
           <span>
-            Already have an account? <Link href="/login">Log in</Link>
+            {t("Already have an account?")} <Link href="/login">{t("Log in")}</Link>
           </span>
         ) : (
           <>
             <span>
-              New here? <Link href="/signup">Create an account</Link>
+              {t("New here?")} <Link href="/signup">{t("Create an account")}</Link>
             </span>
             <button type="button" className="link-button" onClick={forgot} disabled={busy}>
-              Forgot password?
+              {t("Forgot password?")}
             </button>
           </>
         )}
       </div>
       <p className="muted small">
-        Just looking?{" "}
+        {t("Just looking?")}{" "}
         <button type="button" className="link-button" onClick={startDemo}>
-          Try the demo
+          {t("Try the demo")}
         </button>{" "}
-        with sample learners and mentors, no account needed.
+        {t("with sample learners and mentors, no account needed.")}
       </p>
     </div>
   );

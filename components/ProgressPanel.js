@@ -4,8 +4,10 @@
 // (for example 2 -> 3 -> 4) so learners can see that revising their work pays off.
 import { useLiveList } from "@/lib/live";
 import { buildCriteriaResults } from "@/lib/progress";
+import { useT } from "@/components/LocaleProvider";
 
 export default function ProgressPanel({ project, tasks, teamId }) {
+  const t = useT();
   // Live: new reviews update the scores straight away.
   const feedback = useLiveList("feedback", "teamId", teamId);
 
@@ -16,31 +18,31 @@ export default function ProgressPanel({ project, tasks, teamId }) {
   const average = reviewed.length
     ? reviewed.reduce((sum, r) => sum + r.latestScore, 0) / reviewed.length
     : null;
-  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const doneCount = tasks.filter((item) => item.status === "done").length;
   const donePercent = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
 
   return (
     <section className="card" style={{ marginTop: 24 }}>
       <div className="spread">
         <div>
-          <h2>Progress</h2>
+          <h2>{t("Progress")}</h2>
           <p className="muted small">
-            Scores from AI feedback, measured against the mentor&apos;s criteria.
+            {t("Scores from AI feedback, measured against the mentor's criteria.")}
           </p>
         </div>
         <div className="row">
           <span className="badge">
-            {reviewed.length} of {rows.length} criteria reviewed
+            {t("{n} of {total} criteria reviewed", { n: reviewed.length, total: rows.length })}
           </span>
-          {average != null && <span className="badge badge-blue">Average {average.toFixed(1)} / 5</span>}
+          {average != null && <span className="badge badge-blue">{t("Average {score} / 5", { score: average.toFixed(1) })}</span>}
         </div>
       </div>
 
       <div className="progress-row">
         <div className="spread" style={{ width: "100%" }}>
-          <strong>Tasks done</strong>
+          <strong>{t("Tasks done")}</strong>
           <span className="muted small">
-            {doneCount} of {tasks.length}
+            {t("{n} of {total}", { n: doneCount, total: tasks.length })}
           </span>
         </div>
         <div className="bar">
@@ -58,7 +60,7 @@ export default function ProgressPanel({ project, tasks, teamId }) {
                 <div className="muted small">{r.taskTitle}</div>
               </div>
               {r.latestScore == null ? (
-                <span className="muted small">Not reviewed yet</span>
+                <span className="muted small">{t("Not reviewed yet")}</span>
               ) : (
                 <span className="row">
                   {r.history.length > 1 && <span className="muted small">{r.history.join(" → ")}</span>}

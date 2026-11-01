@@ -20,8 +20,10 @@ import Link from "next/link";
 import { currentAuthUser } from "@/lib/auth";
 import { requestMentorRole } from "@/lib/db";
 import { collectMyData, downloadJson } from "@/lib/exportData";
+import { useT } from "@/components/LocaleProvider";
 
 function MentorApplication({ user, onSaved }) {
+  const t = useT();
   const toast = useToast();
   const request = user.mentorRequest;
   const [name, setName] = useState(request?.name || user.name || "");
@@ -30,12 +32,21 @@ function MentorApplication({ user, onSaved }) {
   const [busy, setBusy] = useState(false);
 
   if (user.role === "mentor") {
-    return <p>You are a mentor{user.company ? ` at ${user.company}` : ""}. Create projects from the New project page.</p>;
+    return (
+      <p>
+        {user.company
+          ? t("You are a mentor at {company}. Create projects from the New project page.", { company: user.company })
+          : t("You are a mentor. Create projects from the New project page.")}
+      </p>
+    );
   }
   if (request && !request.declinedAt) {
     return (
       <p>
-        Your application to mentor as <strong>{request.name}</strong> ({request.company}) is waiting for approval.
+        {t("Your application to mentor as {name} ({company}) is waiting for approval.", {
+          name: request.name,
+          company: request.company,
+        })}
       </p>
     );
   }
@@ -46,37 +57,38 @@ function MentorApplication({ user, onSaved }) {
     try {
       await requestMentorRole(user.id, { name, company, note });
       await onSaved();
-      toast("Application sent. An admin will review it.");
+      toast(t("Application sent. An admin will review it."));
     } catch (err) {
-      toast(err.message || "Could not send the application", "error");
+      toast(err.message || t("Could not send the application"), "error");
     }
     setBusy(false);
   }
 
   return (
     <form onSubmit={apply} className="stack">
-      {request?.declinedAt && <p className="error">Your last application was not approved. You can apply again.</p>}
+      {request?.declinedAt && <p className="error">{t("Your last application was not approved. You can apply again.")}</p>}
       <p className="muted small">
-        Mentors write projects and give final feedback. An admin checks every application, because mentors see
-        learners&apos; work. Learners will see the name and company below.
+        {t(
+          "Mentors write projects and give final feedback. An admin checks every application, because mentors see learners' work. Learners will see the name and company below."
+        )}
       </p>
       <div className="form-row">
         <label className="field">
-          Public name
+          {t("Public name")}
           <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} />
         </label>
         <label className="field">
-          Company
+          {t("Company")}
           <input value={company} onChange={(e) => setCompany(e.target.value)} required maxLength={80} />
         </label>
       </div>
       <label className="field">
-        Your role and experience (optional)
+        {t("Your role and experience (optional)")}
         <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} style={{ minHeight: 70 }} />
       </label>
       <div>
         <button className="btn btn-secondary" disabled={busy || !name.trim() || !company.trim()}>
-          {busy ? "Sending…" : "Apply to be a mentor"}
+          {busy ? t("Sending…") : t("Apply to be a mentor")}
         </button>
       </div>
     </form>
@@ -86,6 +98,7 @@ function MentorApplication({ user, onSaved }) {
 // How this account can log in: email + password and/or Google. Linking both lets an account
 // created with email also log in with Google later (and the other way round).
 function SignInMethods() {
+  const t = useT();
   const toast = useToast();
   const { authInfo, refreshAuthInfo } = useUser();
   const [password, setPassword] = useState("");
@@ -94,7 +107,7 @@ function SignInMethods() {
   const providers = authInfo?.providers || [];
   const hasPassword = providers.includes("password");
   const hasGoogle = providers.includes("google.com");
-  const googleProblem = typeof window === "undefined" ? "" : googleSignInProblem();
+  const googleProblem = typeof window === "undefined" ? "" : googleSignInProblem(t);
 
   // Get the Google window ready, so "Connect Google" is not blocked as a pop-up.
   useEffect(() => {
@@ -108,15 +121,17 @@ function SignInMethods() {
     try {
       await action();
       await refreshAuthInfo();
-      if (success) toast(success);
+      if (success) toast(t(success));
     } catch (e) {
       // If Firebase will not add a password to a Google account directly, a reset link sets one.
       setError(
         key === "password" && e?.code === "auth/email-already-in-use"
-          ? "A password could not be added here. Log out, click “Forgot password?” on the log in page, and enter this email: the link lets you set a password."
+          ? t(
+              "A password could not be added here. Log out, click “Forgot password?” on the log in page, and enter this email: the link lets you set a password."
+            )
           : key === "google"
-            ? await explainGoogleError(e, startedAt)
-            : explainAuthError(e)
+            ? await explainGoogleError(e, startedAt, t)
+            : explainAuthError(e, t)
       );
     }
     setBusy("");
@@ -124,14 +139,14 @@ function SignInMethods() {
 
   return (
     <section className="card stack">
-      <h2>Sign-in methods</h2>
+      <h2>{t("Sign-in methods")}</h2>
       <ul className="list-plain">
         <li>
           <div className="spread">
             <div>
-              <strong>Email</strong> · {authInfo?.email || "–"}
+              <strong>{t("Email")}</strong> · {authInfo?.email || "–"}
               <div className="muted small">
-                {authInfo?.emailVerified ? "Verified" : "Not verified yet: check your inbox for the link."}
+                {authInfo?.emailVerified ? t("Verified") : t("Not verified yet: check your inbox for the link.")}
               </div>
             </div>
             {!authInfo?.emailVerified && (
@@ -141,10 +156,10 @@ function SignInMethods() {
                   disabled={Boolean(busy)}
                   onClick={() => act("verify", resendVerification, "Verification email sent")}
                 >
-                  Resend link
+                  {t("Resend link")}
                 </button>
                 <button className="btn btn-ghost btn-small" disabled={Boolean(busy)} onClick={() => act("check", async () => {})}>
-                  I&apos;ve verified
+                  {t("I've verified")}
                 </button>
               </span>
             )}
@@ -153,10 +168,10 @@ function SignInMethods() {
         <li>
           <div className="spread">
             <div>
-              <strong>Password</strong>
-              <div className="muted small">{hasPassword ? "You can log in with your email and password." : "Not set."}</div>
+              <strong>{t("Password")}</strong>
+              <div className="muted small">{hasPassword ? t("You can log in with your email and password.") : t("Not set.")}</div>
             </div>
-            {hasPassword && <span className="badge badge-green">On</span>}
+            {hasPassword && <span className="badge badge-green">{t("On")}</span>}
           </div>
           {!hasPassword && (
             <form
@@ -173,14 +188,14 @@ function SignInMethods() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="New password (6+ characters)"
+                placeholder={t("New password (6+ characters)")}
                 autoComplete="new-password"
                 minLength={6}
                 style={{ maxWidth: 260 }}
-                aria-label="New password"
+                aria-label={t("New password")}
               />
               <button className="btn btn-secondary btn-small" disabled={Boolean(busy) || password.length < 6}>
-                Add password
+                {t("Add password")}
               </button>
             </form>
           )}
@@ -190,19 +205,19 @@ function SignInMethods() {
             <div>
               <strong>Google</strong>
               <div className="muted small">
-                {hasGoogle ? "You can log in with Google." : "Connect Google to log in with one click next time."}
+                {hasGoogle ? t("You can log in with Google.") : t("Connect Google to log in with one click next time.")}
               </div>
             </div>
             {hasGoogle ? (
               <span className="row">
-                <span className="badge badge-green">Connected</span>
+                <span className="badge badge-green">{t("Connected")}</span>
                 {hasPassword && (
                   <button
                     className="btn btn-ghost btn-small"
                     disabled={Boolean(busy)}
                     onClick={() => act("unlink", disconnectGoogle, "Google disconnected")}
                   >
-                    Disconnect
+                    {t("Disconnect")}
                   </button>
                 )}
               </span>
@@ -212,7 +227,7 @@ function SignInMethods() {
                 disabled={Boolean(busy) || Boolean(googleProblem)}
                 onClick={() => act("google", connectGoogle, "Google connected")}
               >
-                {busy === "google" ? "Connecting…" : "Connect Google"}
+                {busy === "google" ? t("Connecting…") : t("Connect Google")}
               </button>
             )}
           </div>
@@ -226,6 +241,7 @@ function SignInMethods() {
 
 // Your data: download a copy, or delete the account and the data that belongs to you.
 function YourData() {
+  const t = useT();
   const toast = useToast();
   const { currentUser, signOut } = useUser();
   const [exporting, setExporting] = useState(false);
@@ -239,9 +255,9 @@ function YourData() {
     try {
       const data = await collectMyData(currentUser.id);
       downloadJson(data, `mantor-my-data-${new Date().toISOString().slice(0, 10)}.json`);
-      toast("Your data was downloaded");
+      toast(t("Your data was downloaded"));
     } catch (e) {
-      toast(e.message || "Could not collect your data", "error");
+      toast(e.message || t("Could not collect your data"), "error");
     }
     setExporting(false);
   }
@@ -257,7 +273,7 @@ function YourData() {
         body: JSON.stringify({ confirm: typed }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Your account could not be deleted");
+      if (!res.ok) throw new Error(data.error || t("Your account could not be deleted"));
       await signOut(); // goes to the home page
     } catch (e) {
       setError(e.message);
@@ -267,38 +283,39 @@ function YourData() {
 
   return (
     <section className="card stack">
-      <h2>Your data</h2>
+      <h2>{t("Your data")}</h2>
       <p className="muted small">
-        See what we store and why in the <Link href="/privacy">Privacy policy</Link>.
+        {t("See what we store and why in the")} <Link href="/privacy">{t("Privacy policy")}</Link>
+        {t(".")}
       </p>
       <div>
         <button className="btn btn-secondary btn-small" onClick={download} disabled={exporting}>
-          {exporting ? "Collecting…" : "Download my data"}
+          {exporting ? t("Collecting…") : t("Download my data")}
         </button>
       </div>
       <div className="danger-zone stack">
-        <strong>Delete my account</strong>
+        <strong>{t("Delete my account")}</strong>
         <p className="small">
-          This permanently deletes your profile, photo, assessment, personal analyses, comments, contribution records,
-          mentor connections and your login. Work you submitted for a team stays with the team, without your name. It
-          cannot be undone.
+          {t(
+            "This permanently deletes your profile, photo, assessment, personal analyses, comments, contribution records, mentor connections and your login. Work you submitted for a team stays with the team, without your name. It cannot be undone."
+          )}
         </p>
         {!confirming ? (
           <div>
             <button className="btn btn-danger btn-small" onClick={() => setConfirming(true)}>
-              Delete my account…
+              {t("Delete my account…")}
             </button>
           </div>
         ) : (
           <div className="stack">
             <label className="field">
-              Type DELETE to confirm
+              {t("Type DELETE to confirm")}
               <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" aria-label="Type DELETE to confirm" />
             </label>
             {error && <p className="error small">{error}</p>}
             <div className="row">
               <button className="btn btn-danger-solid btn-small" onClick={remove} disabled={typed !== "DELETE" || deleting}>
-                {deleting ? "Deleting…" : "Permanently delete my account"}
+                {deleting ? t("Deleting…") : t("Permanently delete my account")}
               </button>
               <button
                 className="btn btn-ghost btn-small"
@@ -308,7 +325,7 @@ function YourData() {
                 }}
                 disabled={deleting}
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -319,15 +336,16 @@ function YourData() {
 }
 
 export default function AccountPage() {
+  const t = useT();
   const toast = useToast();
   const { mode, currentUser, refreshUsers, signOut } = useUser();
 
-  if (!currentUser) return <p className="muted">Loading…</p>;
+  if (!currentUser) return <p className="muted">{t("Loading…")}</p>;
   if (mode !== "auth") {
     return (
       <div className="card">
-        <h1>Account</h1>
-        <p className="muted">You are using the demo, so there is no account. Use “Viewing as” to switch people.</p>
+        <h1>{t("Account")}</h1>
+        <p className="muted">{t("You are using the demo, so there is no account. Use “Viewing as” to switch people.")}</p>
       </div>
     );
   }
@@ -335,24 +353,24 @@ export default function AccountPage() {
   return (
     <div className="stack" style={{ maxWidth: 760 }}>
       <div>
-        <h1>Account</h1>
+        <h1>{t("Account")}</h1>
         <p className="muted">
-          {currentUser.role === "mentor" ? "Mentor" : "Learner"}
-          {currentUser.admin ? " · Admin" : ""}
-          {currentUser.role === "learner" && ` · mentors see you as ${currentUser.anonymousName}`}
+          {currentUser.role === "mentor" ? t("Mentor") : t("Learner")}
+          {currentUser.admin ? ` · ${t("Admin")}` : ""}
+          {currentUser.role === "learner" && ` · ${t("mentors see you as {anon}", { anon: currentUser.anonymousName })}`}
         </p>
       </div>
 
       <section className="card stack">
-        <h2>Your details</h2>
+        <h2>{t("Your details")}</h2>
         <PhotoPicker />
-        <ProfileForm submitLabel="Save changes" onSaved={() => toast("Details saved")} />
+        <ProfileForm submitLabel={t("Save changes")} onSaved={() => toast(t("Details saved"))} />
       </section>
 
       <SignInMethods />
 
       <section className="card stack">
-        <h2>Mentoring</h2>
+        <h2>{t("Mentoring")}</h2>
         <MentorApplication user={currentUser} onSaved={refreshUsers} />
       </section>
 
@@ -360,7 +378,7 @@ export default function AccountPage() {
 
       <div>
         <button className="btn btn-ghost" onClick={signOut}>
-          Log out
+          {t("Log out")}
         </button>
       </div>
     </div>

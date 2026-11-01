@@ -12,6 +12,7 @@ import {
   readJson,
   tooManyRequests,
 } from "@/lib/server/ai";
+import { LOCALES, aiLanguage, translator } from "@/lib/i18n";
 
 const SYSTEM_PROMPT = `You are a supportive career coach for a beginner who just finished project work on a learning platform.
 Use ONLY the evidence provided (criteria scores, mentor and AI comments, the learner's own contributions). Never invent work that is not there.
@@ -118,8 +119,9 @@ function buildPrompt(input) {
   ].join("\n");
 }
 
-// Analysis built from the scores alone (used without an API key).
+// Analysis built from the scores alone (used without an API key), in the learner's language.
 function simulatedAnalysis(input, reason) {
+  const t = translator(input.locale);
   const reviewed = input.results.filter((r) => r.latestScore != null);
   const strong = reviewed.filter((r) => r.latestScore >= 4);
   const weak = reviewed.filter((r) => r.latestScore <= 3);
@@ -130,31 +132,64 @@ function simulatedAnalysis(input, reason) {
   const improved = reviewed.filter((r) => r.firstScore != null && r.latestScore > r.firstScore);
   const hours = input.contributions.reduce((sum, c) => sum + c.hoursSpent, 0);
 
-  const summary =
-    `${reason === "error" ? "The AI service could not be reached, so this analysis is simulated from your scores. " : "This analysis is simulated from your scores because no Claude API key is set. "}` +
-    (reviewed.length
-      ? `Across ${reviewed.length} reviewed criteria your average is ${average.toFixed(1)} out of 5` +
-        (improved.length ? `, and ${improved.length} improved after you revised your work.` : ".")
-      : "You have no reviewed criteria yet.");
+  const intro =
+    reason === "error"
+      ? t("The AI service could not be reached, so this analysis is simulated from your scores.")
+      : t("This analysis is simulated from your scores because no Claude API key is set.");
+  const result = !reviewed.length
+    ? t("You have no reviewed criteria yet.")
+    : improved.length
+      ? t("Across {n} reviewed criteria your average is {avg} out of 5, and {improved} improved after you revised your work.", {
+          n: reviewed.length,
+          avg: average.toFixed(1),
+          improved: improved.length,
+        })
+      : t("Across {n} reviewed criteria your average is {avg} out of 5.", { n: reviewed.length, avg: average.toFixed(1) });
+  const summary = `${intro} ${result}`;
 
-  const strengths = strong.map((r) => `${r.name}: scored ${r.latestScore}/5. ${r.latestComment || "Keep doing what you did here."}`);
-  if (improved.length) strengths.push(`You improved your work after feedback (${improved.map((r) => r.name).join(", ")}). Acting on feedback is a key workplace skill.`);
-  if (hours > 0) strengths.push(`You recorded ${hours} hour(s) of your own contribution, which makes your teamwork visible.`);
-  if (!strengths.length) strengths.push("You started the project and put real work on the board.");
+  const strengths = strong.map(
+    (r) =>
+      `${t("{name}: scored {score}/5.", { name: r.name, score: r.latestScore })} ${r.latestComment || t("Keep doing what you did here.")}`
+  );
+  if (improved.length) {
+    strengths.push(
+      t("You improved your work after feedback ({names}). Acting on feedback is a key workplace skill.", {
+        names: improved.map((r) => r.name).join(", "),
+      })
+    );
+  }
+  if (hours > 0) {
+    strengths.push(t("You recorded {h} hour(s) of your own contribution, which makes your teamwork visible.", { h: hours }));
+  }
+  if (!strengths.length) strengths.push(t("You started the project and put real work on the board."));
 
-  const improvements = weak.map((r) => `${r.name}: scored ${r.latestScore}/5. ${r.latestComment || `Aim for this standard: ${r.description}`}`);
-  notReviewed.forEach((r) => improvements.push(`${r.name}: not reviewed yet. Submit "${r.taskTitle}" and ask for feedback.`));
-  if (!improvements.length) improvements.push("No weak spots in the reviewed criteria. Try a harder project next.");
+  const improvements = weak.map(
+    (r) =>
+      `${t("{name}: scored {score}/5.", { name: r.name, score: r.latestScore })} ${
+        r.latestComment || t("Aim for this standard: {standard}", { standard: r.description })
+      }`
+  );
+  notReviewed.forEach((r) =>
+    improvements.push(t('{name}: not reviewed yet. Submit "{task}" and ask for feedback.', { name: r.name, task: r.taskTitle }))
+  );
+  if (!improvements.length) improvements.push(t("No weak spots in the reviewed criteria. Try a harder project next."));
 
-  const nextSteps = weak.slice(0, 2).map((r) => `Revise "${r.taskTitle}" and check it against: ${r.description}`);
-  if (input.mentorFinal) nextSteps.push("Pick one point from your mentor's final feedback and apply it in your next project.");
-  nextSteps.push("Choose a new project in the same field, or a harder one, and repeat the cycle.");
+  const nextSteps = weak
+    .slice(0, 2)
+    .map((r) => t('Revise "{task}" and check it against: {standard}', { task: r.taskTitle, standard: r.description }));
+  if (input.mentorFinal) nextSteps.push(t("Pick one point from your mentor's final feedback and apply it in your next project."));
+  nextSteps.push(t("Choose a new project in the same field, or a harder one, and repeat the cycle."));
 
   const fieldCourse = COURSES.find((c) => c.field === input.project.field);
   const general = COURSES.find((c) => c.id === "course_pm");
   const courses = [];
-  if (fieldCourse) courses.push({ id: fieldCourse.id, reason: `Builds the core skills behind this ${input.project.field} project.` });
-  if (general) courses.push({ id: general.id, reason: "Teamwork, planning and communication are used in every project." });
+  if (fieldCourse) {
+    courses.push({
+      id: fieldCourse.id,
+      reason: t("Builds the core skills behind this {field} project.", { field: t(input.project.field) }),
+    });
+  }
+  if (general) courses.push({ id: general.id, reason: t("Teamwork, planning and communication are used in every project.") });
 
   return { summary, strengths, improvements, nextSteps: nextSteps.slice(0, 3), courses, simulated: true };
 }
@@ -167,7 +202,7 @@ export async function POST(request) {
   if (!body.project || !Array.isArray(body.criteriaResults)) {
     return Response.json({ error: "Project and criteria results are required" }, { status: 400 });
   }
-  const input = cleanInput(body);
+  const input = { ...cleanInput(body), locale: LOCALES.includes(body.locale) ? body.locale : "en" };
   if (!input.results.some((r) => r.latestScore != null)) {
     return Response.json({ error: "Get feedback on at least one task first." }, { status: 400 });
   }
@@ -178,7 +213,11 @@ export async function POST(request) {
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   try {
-    const output = await askJson({ system: SYSTEM_PROMPT, prompt: buildPrompt(input), schema: ANALYSIS_SCHEMA });
+    const output = await askJson({
+      system: `${SYSTEM_PROMPT}\n${aiLanguage(input.locale)}`,
+      prompt: buildPrompt(input),
+      schema: ANALYSIS_SCHEMA,
+    });
 
     const strings = (v, n) => (Array.isArray(v) ? v.map((s) => String(s)).filter(Boolean).slice(0, n) : []);
     const validIds = new Set(COURSES.map((c) => c.id));

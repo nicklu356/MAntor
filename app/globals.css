@@ -1521,3 +1521,21 @@ details.match summary::-webkit-details-marker {
   border-radius: 8px;
   border: 2px solid var(--error);
 }
+
+/* ---------- Language switch ---------- */
+
+.lang-switch {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(28, 38, 64, 0.35);
+  background: transparent;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.lang-switch:hover {
+  border-color: var(--orange);
+}

@@ -8,18 +8,20 @@ import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { approveMentor, declineMentor, removeDemoRecords, seedSampleContent } from "@/lib/db";
 import { timeAgo } from "@/lib/format";
+import { useT } from "@/components/LocaleProvider";
 
 export default function AdminPage() {
+  const t = useT();
   const toast = useToast();
   const { mode, users, isAdmin, refreshUsers, currentUser } = useUser();
   const [busy, setBusy] = useState("");
 
-  if (!currentUser) return <p className="muted">Loading…</p>;
+  if (!currentUser) return <p className="muted">{t("Loading…")}</p>;
   if (mode !== "auth" || !isAdmin) {
     return (
       <div className="card">
-        <h1>Admin</h1>
-        <p className="muted">Only admins can open this page.</p>
+        <h1>{t("Admin")}</h1>
+        <p className="muted">{t("Only admins can open this page.")}</p>
       </div>
     );
   }
@@ -33,9 +35,9 @@ export default function AdminPage() {
     try {
       const result = await action();
       await refreshUsers();
-      toast(typeof success === "function" ? success(result) : success);
+      toast(typeof success === "function" ? success(result) : t(success));
     } catch (e) {
-      toast(e.message || "Something went wrong", "error");
+      toast(e.message || t("Something went wrong"), "error");
     }
     setBusy("");
   }
@@ -43,21 +45,21 @@ export default function AdminPage() {
   return (
     <div className="stack" style={{ maxWidth: 860 }}>
       <div>
-        <h1>Admin</h1>
+        <h1>{t("Admin")}</h1>
         <p className="muted">
-          {learners.length} learners · {mentors.length} mentors
+          {t("{learners} learners · {mentors} mentors", { learners: learners.length, mentors: mentors.length })}
         </p>
       </div>
 
       <section className="card">
         <div className="spread">
-          <h2>Mentor applications</h2>
+          <h2>{t("Mentor applications")}</h2>
           <span className={pending.length ? "badge badge-amber" : "badge badge-green"}>
-            {pending.length ? `${pending.length} waiting` : "None waiting"}
+            {pending.length ? t("{n} waiting", { n: pending.length }) : t("None waiting")}
           </span>
         </div>
         {pending.length === 0 ? (
-          <p className="muted small">New applications appear here. People apply from their Account page.</p>
+          <p className="muted small">{t("New applications appear here. People apply from their Account page.")}</p>
         ) : (
           <ul className="list-plain">
             {pending.map((u) => (
@@ -66,7 +68,7 @@ export default function AdminPage() {
                   <div>
                     <strong>{u.mentorRequest.name}</strong> · {u.mentorRequest.company}
                     <div className="muted small">
-                      {u.anonymousName} · applied {timeAgo(u.mentorRequest.at)}
+                      {u.anonymousName} · {t("applied {when}", { when: timeAgo(u.mentorRequest.at, Date.now(), t) })}
                     </div>
                     {u.mentorRequest.note && <blockquote className="quote">{u.mentorRequest.note}</blockquote>}
                   </div>
@@ -74,16 +76,16 @@ export default function AdminPage() {
                     <button
                       className="btn btn-small"
                       disabled={Boolean(busy)}
-                      onClick={() => act(u.id, () => approveMentor(u), `${u.mentorRequest.name} is now a mentor`)}
+                      onClick={() => act(u.id, () => approveMentor(u), () => t("{name} is now a mentor", { name: u.mentorRequest.name }))}
                     >
-                      Approve
+                      {t("Approve")}
                     </button>
                     <button
                       className="btn btn-ghost btn-small"
                       disabled={Boolean(busy)}
                       onClick={() => act(u.id, () => declineMentor(u), "Application declined")}
                     >
-                      Decline
+                      {t("Decline")}
                     </button>
                   </span>
                 </div>
@@ -94,10 +96,11 @@ export default function AdminPage() {
       </section>
 
       <section className="card stack">
-        <h2>Sample content</h2>
+        <h2>{t("Sample content")}</h2>
         <p className="muted small">
-          Loads the 8 sample projects and their sample mentors, so new learners have something to join. Running it
-          again resets those projects (teams already working on them keep their tasks).
+          {t(
+            "Loads the 8 sample projects and their sample mentors, so new learners have something to join. Running it again resets those projects (teams already working on them keep their tasks)."
+          )}
         </p>
         <div>
           <button
@@ -105,22 +108,23 @@ export default function AdminPage() {
             disabled={Boolean(busy)}
             onClick={() => act("seed", seedSampleContent, "Sample projects loaded")}
           >
-            {busy === "seed" ? "Loading…" : "Load sample projects"}
+            {busy === "seed" ? t("Loading…") : t("Load sample projects")}
           </button>
         </div>
         <p className="muted small">
-          If you loaded the old demo data (Mia, Liam, Sofia, Noah and their teams) into this database before accounts
-          existed, remove it here. Real users are not touched.
+          {t(
+            "If you loaded the old demo data (Mia, Liam, Sofia, Noah and their teams) into this database before accounts existed, remove it here. Real users are not touched."
+          )}
         </p>
         <div>
           <button
             className="btn btn-danger"
             disabled={Boolean(busy)}
             onClick={() =>
-              act("clean", removeDemoRecords, (n) => (n ? `Removed ${n} old demo records` : "No old demo records found"))
+              act("clean", removeDemoRecords, (n) => (n ? t("Removed {n} old demo records", { n }) : t("No old demo records found")))
             }
           >
-            {busy === "clean" ? "Removing…" : "Remove old demo records"}
+            {busy === "clean" ? t("Removing…") : t("Remove old demo records")}
           </button>
         </div>
       </section>

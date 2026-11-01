@@ -6,8 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { getProject, getTeamsForProject, getTeamsForUser, getUser, joinProject } from "@/lib/db";
+import { useT } from "@/components/LocaleProvider";
 
 export default function ProjectDetailPage() {
+  const t = useT();
   const { id } = useParams();
   const router = useRouter();
   const { mode, currentUser, isMentor, userName, signedOut } = useUser();
@@ -31,7 +33,7 @@ export default function ProjectDetailPage() {
       return;
     }
     getTeamsForUser(currentUser.id).then((teams) =>
-      setMyTeam(teams.find((t) => t.projectId === id) || null)
+      setMyTeam(teams.find((item) => item.projectId === id) || null)
     );
   }, [currentUser, isMentor, id]);
 
@@ -54,37 +56,37 @@ export default function ProjectDetailPage() {
           : await joinProject(id, currentUser.id);
       router.push(`/teams/${team.id}`);
     } catch (e) {
-      setError(e.message || "Could not join the project");
+      setError(e.message || t("Could not join the project"));
       setJoining(false);
     }
   }
 
-  if (project === undefined) return <p className="muted">Loading…</p>;
-  if (project === null) return <p>Project not found.</p>;
+  if (project === undefined) return <p className="muted">{t("Loading…")}</p>;
+  if (project === null) return <p>{t("Project not found.")}</p>;
 
   const isProjectMentor = Boolean(isMentor && currentUser && project.mentorId === currentUser.id);
   const openSpots = projectTeams
-    .filter((t) => t.status === "active")
-    .reduce((sum, t) => sum + Math.max(0, project.teamSize - t.memberIds.length), 0);
+    .filter((item) => item.status === "active")
+    .reduce((sum, team) => sum + Math.max(0, project.teamSize - team.memberIds.length), 0);
 
   return (
     <div>
       <Link href="/projects" className="back">
-        ← All projects
+        {t("← All projects")}
       </Link>
 
       <div className="two-col">
         <div className="stack">
           <section className="card">
             <div className="row">
-              <span className="badge badge-blue">{project.field}</span>
-              <span className="badge">{project.difficulty}</span>
+              <span className="badge badge-blue">{t(project.field)}</span>
+              <span className="badge">{t(project.difficulty)}</span>
             </div>
             <div className="spread" style={{ marginTop: 12 }}>
               <h1>{project.title}</h1>
               {isProjectMentor && (
                 <Link href={`/projects/${project.id}/edit`} className="btn btn-secondary btn-small">
-                  Edit project
+                  {t("Edit project")}
                 </Link>
               )}
             </div>
@@ -92,9 +94,9 @@ export default function ProjectDetailPage() {
           </section>
 
           <section className="card">
-            <h2>What the mentor looks for</h2>
+            <h2>{t("What the mentor looks for")}</h2>
             <p className="muted small">
-              These criteria are the industry standard for this project. AI feedback uses them to review your work.
+              {t("These criteria are the industry standard for this project. AI feedback uses them to review your work.")}
             </p>
             <ul className="criteria-list">
               {project.criteria.map((c) => (
@@ -107,12 +109,12 @@ export default function ProjectDetailPage() {
           </section>
 
           <section className="card">
-            <h2>Tasks</h2>
+            <h2>{t("Tasks")}</h2>
             <ol>
-              {(project.taskTemplates || []).map((t) => (
-                <li key={t.title} style={{ marginBottom: 8 }}>
-                  <strong>{t.title}</strong>
-                  <div className="muted small">{t.description}</div>
+              {(project.taskTemplates || []).map((item) => (
+                <li key={item.title} style={{ marginBottom: 8 }}>
+                  <strong>{item.title}</strong>
+                  <div className="muted small">{item.description}</div>
                 </li>
               ))}
             </ol>
@@ -120,23 +122,23 @@ export default function ProjectDetailPage() {
 
           {isProjectMentor && (
             <section className="card">
-              <h2>Teams on your project</h2>
+              <h2>{t("Teams on your project")}</h2>
               {projectTeams.length === 0 ? (
-                <p className="muted small">No team has joined yet.</p>
+                <p className="muted small">{t("No team has joined yet.")}</p>
               ) : (
                 <ul className="list-plain">
-                  {projectTeams.map((t, index) => (
-                    <li key={t.id}>
+                  {projectTeams.map((item, index) => (
+                    <li key={item.id}>
                       <div className="spread">
                         <div>
-                          <Link href={`/teams/${t.id}`}>
-                            <strong>Team {index + 1}</strong>
+                          <Link href={`/teams/${item.id}`}>
+                            <strong>{t("Team {n}", { n: index + 1 })}</strong>
                           </Link>
-                          <span className="muted small"> · {t.status}</span>
-                          <div className="muted small">{t.memberIds.map(userName).join(", ")}</div>
+                          <span className="muted small"> · {item.status}</span>
+                          <div className="muted small">{item.memberIds.map(userName).join(", ")}</div>
                         </div>
-                        <Link href={`/teams/${t.id}`} className="btn btn-secondary btn-small">
-                          Open team →
+                        <Link href={`/teams/${item.id}`} className="btn btn-secondary btn-small">
+                          {t("Open team →")}
                         </Link>
                       </div>
                     </li>
@@ -149,41 +151,43 @@ export default function ProjectDetailPage() {
 
         <aside className="card stack">
           <div>
-            <div className="eyebrow">Mentor</div>
+            <div className="eyebrow">{t("Mentor")}</div>
             <strong>{mentor?.name}</strong>
             <div className="muted small">{project.company}</div>
           </div>
           <div>
-            <div className="eyebrow">Team size</div>
-            {project.teamSize} learners
+            <div className="eyebrow">{t("Team size")}</div>
+            {t("{n} learners", { n: project.teamSize })}
           </div>
           <div hidden={signedOut}>
-            <div className="eyebrow">Teams</div>
-            {projectTeams.filter((t) => t.status === "active").length} active
-            {openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? "s" : ""}` : " · joining starts a new team"}
+            <div className="eyebrow">{t("Teams")}</div>
+            {t("{n} active", { n: projectTeams.filter((team) => team.status === "active").length })}
+            {openSpots > 0
+              ? ` · ${t(openSpots > 1 ? "{n} open spots" : "{n} open spot", { n: openSpots })}`
+              : ` · ${t("joining starts a new team")}`}
           </div>
           {isMentor ? (
             <p className="muted small">
               {isProjectMentor
-                ? "This is your project. Open a team to guide it and give final feedback."
-                : "You are viewing as a mentor. Only learners can join projects."}
+                ? t("This is your project. Open a team to guide it and give final feedback.")
+                : t("You are viewing as a mentor. Only learners can join projects.")}
             </p>
           ) : signedOut ? (
             <Link href={`/signup?next=${encodeURIComponent(`/projects/${id}`)}`} className="btn">
-              Sign up to join
+              {t("Sign up to join")}
             </Link>
           ) : myTeam ? (
             <Link href={`/teams/${myTeam.id}`} className="btn">
-              Go to my team
+              {t("Go to my team")}
             </Link>
           ) : (
             <button className="btn" onClick={handleJoin} disabled={joining || !currentUser}>
-              {joining ? "Joining…" : "Join this project"}
+              {joining ? t("Joining…") : t("Join this project")}
             </button>
           )}
           {error && <p className="error">{error}</p>}
           <p className="muted small">
-            Mentors only see your anonymous name, so your work is judged on its own merit.
+            {t("Mentors only see your anonymous name, so your work is judged on its own merit.")}
           </p>
         </aside>
       </div>

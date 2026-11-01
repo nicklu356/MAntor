@@ -43,6 +43,7 @@ Students and career changers need hands-on experience, but online learning rarel
 | Privacy policy and terms, "Download my data", "Delete my account" | ✅ Built (deletion needs `FIREBASE_SERVICE_ACCOUNT`) |
 | Live updates: board, discussion, submissions, feedback and team appear for everyone without reloading (also between tabs in the demo) | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
+| English and Traditional Chinese (繁體中文): button in the header, Chinese browsers get Chinese automatically, AI answers in the chosen language | ✅ Built |
 
 ### 🔌 What happens without an API key
 
@@ -214,7 +215,7 @@ Anonymous names: Mia = `Learner #A3F`, Liam = `Learner #B71`, Sofia = `Learner #
 ```
 app/
   page.js                          Home: learner (result + teams) or mentor (projects + teams)
-  assessment/page.js               Career assessment (6 questions)
+  assessment/page.js               Career assessment (32 activities)
   projects/page.js                 Browse projects
   projects/[id]/page.js            Project brief, mentor criteria, Join
   projects/new/page.js             Mentor: publish a new project
@@ -254,6 +255,7 @@ components/
   ConnectionRequests.js            Learner accepts or declines mentor requests
   NotificationBell.js              Bell in the header
   Hero.js, Toast.js                Home banner; small confirmation messages
+  LocaleProvider.js                The chosen language: useT() gives components the translator
 lib/
   db.js                            Every read and write (Firebase or demo mode)
   seed.js                          Demo users, projects, team, tasks, example feedback, comments
@@ -273,6 +275,9 @@ lib/
   session.js                       Demo or real accounts
   live.js                          useLiveList / useLiveDoc hooks (live updates)
   firebase.js, mockStore.js, config.js
+  i18n/index.js                    translate(), language choice (cookie, then browser language)
+  i18n/zh-TW.js                    Traditional Chinese text, keyed by the English original
+  i18n/server.js                   getT() for server pages (about, privacy, public portfolio)
 tests/                             Unit tests for lib/ (npm test)
 e2e/                               Browser tests: demo.spec.mjs (demo), accounts.spec.mjs (accounts, emulators)
 tests/rules/                       Firestore security rules tests (emulators)
@@ -284,6 +289,7 @@ docs/
 ### Common changes
 
 * **App name:** `lib/config.js`
+* **Text and translations:** write English in the code inside `t("...")` (`const t = useT()` in components, `await getT()` in server pages), then add the same text with its Chinese version to `lib/i18n/zh-TW.js`. Text without a translation falls back to English, and `npm test` lists any `t("...")` text that is missing from the dictionary. Use `{name}` placeholders instead of joining strings, so the word order can change in Chinese. Content people write (projects, submissions, comments) is shown as written
 * **Colours and fonts (to match Figma):** the variables at the top of `app/globals.css`
 * **Projects, criteria, demo learners:** `lib/seed.js` (then reset demo data, or reload it into Firebase at `/setup`)
 * **How the AI gives feedback:** `SYSTEM_PROMPT` in `app/api/feedback/route.js` (the coach and project draft have their own prompts in `app/api/coach` and `app/api/project-draft`)

@@ -10,6 +10,7 @@ import CareerResult from "@/components/CareerResult";
 import { useUser } from "@/components/UserProvider";
 import { FIELD_INFO, ITEMS, SCALE, describeAnswers, scoreAssessment } from "@/lib/assessment";
 import { getProjects, updateUser } from "@/lib/db";
+import { useLocale } from "@/components/LocaleProvider";
 
 const PAGE_SIZE = 8;
 const PAGES = Math.ceil(ITEMS.length / PAGE_SIZE);
@@ -30,6 +31,7 @@ function savedResult(user) {
 }
 
 export default function AssessmentPage() {
+  const { t, locale } = useLocale();
   const { currentUser, isMentor, refreshUsers } = useUser();
   const [mode, setMode] = useState("intro"); // intro | quiz | result
   const [answers, setAnswers] = useState({});
@@ -66,12 +68,12 @@ export default function AssessmentPage() {
 
   const pageItems = useMemo(() => ITEMS.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [page]);
 
-  if (!currentUser) return <p className="muted">Loading…</p>;
+  if (!currentUser) return <p className="muted">{t("Loading…")}</p>;
   if (isMentor) {
     return (
       <div className="card">
-        <h1>Career assessment</h1>
-        <p className="muted">The assessment is for learners. Switch to a learner in the header to try it.</p>
+        <h1>{t("Career assessment")}</h1>
+        <p className="muted">{t("The assessment is for learners. Switch to a learner in the header to try it.")}</p>
       </div>
     );
   }
@@ -123,6 +125,7 @@ export default function AssessmentPage() {
           runnerUp: scored.runnerUp,
           hollandCode: scored.hollandCode,
           answers: describeAnswers(answers),
+          locale,
         }),
       });
       const data = await res.json();
@@ -153,7 +156,7 @@ export default function AssessmentPage() {
       setMode("result");
       window.scrollTo({ top: 0 });
     } catch (err) {
-      setError(err.message || "Could not save your result");
+      setError(err.message || t("Could not save your result"));
     }
     setSaving(false);
   }
@@ -161,9 +164,11 @@ export default function AssessmentPage() {
   if (mode === "result" && result) {
     return (
       <div style={{ maxWidth: 860 }}>
-        <h1>Career assessment</h1>
+        <h1>{t("Career assessment")}</h1>
         {currentUser.assessedAt && (
-          <p className="muted small">Taken on {new Date(currentUser.assessedAt).toLocaleDateString()}</p>
+          <p className="muted small">
+            {t("Taken on {date}", { date: new Date(currentUser.assessedAt).toLocaleDateString() })}
+          </p>
         )}
         <CareerResult result={result} projectCounts={projectCounts} onRetake={() => start(true)} />
       </div>
@@ -174,40 +179,45 @@ export default function AssessmentPage() {
     return (
       <div className="card stack" style={{ maxWidth: 720 }}>
         <div>
-          <h1>Career assessment</h1>
+          <h1>{t("Career assessment")}</h1>
           <p>
-            Rate {ITEMS.length} short work activities by how much you would enjoy doing them. It takes about 5 minutes.
+            {t("Rate {n} short work activities by how much you would enjoy doing them. It takes about 5 minutes.", {
+              n: ITEMS.length,
+            })}
           </p>
         </div>
         <ul className="bullets">
-          <li>Think about whether you would <strong>enjoy</strong> it, not whether you already have the skills.</li>
-          <li>There are no right or wrong answers. Use the whole scale: it makes your result more accurate.</li>
+          <li>{t("Think about whether you would enjoy it, not whether you already have the skills.")}</li>
+          <li>{t("There are no right or wrong answers. Use the whole scale: it makes your result more accurate.")}</li>
           <li>
-            You get your best match among {Object.keys(FIELD_INFO).length} career fields, how every field fits you, and
-            your interest profile.
+            {t("You get your best match among {n} career fields, how every field fits you, and your interest profile.", {
+              n: Object.keys(FIELD_INFO).length,
+            })}
           </li>
         </ul>
         {currentUser.careerField && !savedResult(currentUser) && (
-          <p className="muted small">Your current result is {currentUser.careerField}. Retaking replaces it.</p>
+          <p className="muted small">
+            {t("Your current result is {field}. Retaking replaces it.", { field: t(currentUser.careerField) })}
+          </p>
         )}
         <div className="row">
           {hasDraft ? (
             <>
               <button className="btn" onClick={() => start(false)}>
-                Continue ({answered} of {ITEMS.length} done)
+                {t("Continue ({answered} of {total} done)", { answered, total: ITEMS.length })}
               </button>
               <button className="btn btn-ghost" onClick={() => start(true)}>
-                Start over
+                {t("Start over")}
               </button>
             </>
           ) : (
             <button className="btn" onClick={() => start(true)}>
-              Start the assessment
+              {t("Start the assessment")}
             </button>
           )}
         </div>
         <p className="muted small">
-          Based on Holland&apos;s RIASEC interest model. A guide for choosing a first project, not a validated career test.
+          {t("Based on Holland's RIASEC interest model. A guide for choosing a first project, not a validated career test.")}
         </p>
       </div>
     );
@@ -218,13 +228,13 @@ export default function AssessmentPage() {
   return (
     <div className="stack" style={{ maxWidth: 820 }}>
       <div>
-        <h1>Career assessment</h1>
+        <h1>{t("Career assessment")}</h1>
         <div className="spread">
           <span className="muted small">
-            Page {page + 1} of {PAGES}
+            {t("Page {page} of {pages}", { page: page + 1, pages: PAGES })}
           </span>
           <span className="muted small">
-            {answered} of {ITEMS.length} answered
+            {t("{answered} of {total} answered", { answered, total: ITEMS.length })}
           </span>
         </div>
         <div className="bar" style={{ marginTop: 8 }}>
@@ -234,12 +244,12 @@ export default function AssessmentPage() {
 
       <div className="card">
         <p className="muted small" style={{ marginBottom: 4 }}>
-          How much would you enjoy…
+          {t("How much would you enjoy…")}
         </p>
         {pageItems.map((item, index) => (
           <fieldset key={item.id} className="likert">
             <legend>
-              <span className="muted small">{page * PAGE_SIZE + index + 1}.</span> {item.text}
+              <span className="muted small">{page * PAGE_SIZE + index + 1}.</span> {t(item.text)}
             </legend>
             <div className="likert-options" role="radiogroup">
               {SCALE.map((s) => (
@@ -251,7 +261,7 @@ export default function AssessmentPage() {
                     checked={answers[item.id] === s.value}
                     onChange={() => rate(item.id, s.value)}
                   />
-                  <span>{s.label}</span>
+                  <span>{t(s.label)}</span>
                 </label>
               ))}
             </div>
@@ -262,19 +272,19 @@ export default function AssessmentPage() {
       {error && <p className="error">{error}</p>}
       <div className="spread">
         <button className="btn btn-ghost" onClick={() => (page === 0 ? setMode(result ? "result" : "intro") : goTo(page - 1))}>
-          ← Back
+          {t("← Back")}
         </button>
         {last ? (
           <button className="btn" onClick={finish} disabled={!pageComplete || saving}>
-            {saving ? "Working out your result…" : "See my result"}
+            {saving ? t("Working out your result…") : t("See my result")}
           </button>
         ) : (
           <button className="btn" onClick={() => goTo(page + 1)} disabled={!pageComplete}>
-            Next →
+            {t("Next →")}
           </button>
         )}
       </div>
-      {!pageComplete && <p className="muted small">Rate every activity on this page to continue.</p>}
+      {!pageComplete && <p className="muted small">{t("Rate every activity on this page to continue.")}</p>}
     </div>
   );
 }

@@ -14,28 +14,31 @@ import { useUser } from "@/components/UserProvider";
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
 import { getProject, getTeam, submitTask, toggleKudos } from "@/lib/db";
 import { useLiveDoc, useLiveList } from "@/lib/live";
+import { useT } from "@/components/LocaleProvider";
 
 const STATUS_LABEL = { todo: "To do", in_progress: "In progress", done: "Done" };
 
 // Teammates thank each other for a contribution.
 function Kudos({ contribution, canGive, mine, onToggle }) {
+  const t = useT();
   const count = (contribution.kudos || []).length;
   if (!canGive && !count) return null;
-  if (!canGive) return <span className="muted small">♥ {count} thanks</span>;
+  if (!canGive) return <span className="muted small">♥ {t("{n} thanks", { n: count })}</span>;
   return (
     <button
       className={mine ? "kudos kudos-on" : "kudos"}
       onClick={onToggle}
       aria-pressed={mine}
-      aria-label={mine ? "Take back your thanks" : "Thank your teammate"}
+      aria-label={mine ? t("Take back your thanks") : t("Thank your teammate")}
     >
-      ♥ {mine ? "Thanked" : "Thanks"}
+      ♥ {mine ? t("Thanked") : t("Thanks")}
       {count > 0 && ` · ${count}`}
     </button>
   );
 }
 
 export default function TaskPage() {
+  const t = useT();
   const { id: teamId, taskId } = useParams();
   const { currentUser, isMentor, userName } = useUser();
   const toast = useToast();
@@ -51,23 +54,25 @@ export default function TaskPage() {
   const savedVersion = useRef(null); // the saved submission the draft was based on
 
   useEffect(() => {
-    getTeam(teamId).then(async (t) => {
-      setTeam(t);
-      if (t) setProject(await getProject(t.projectId));
+    getTeam(teamId).then(async (item) => {
+      setTeam(item);
+      if (item) setProject(await getProject(item.projectId));
     });
   }, [teamId]);
 
   // When the saved submission changes, follow it, unless you are in the middle of editing:
   // then keep your text and say a teammate saved a newer version.
+  // (Read the draft through a ref: a state updater may run later, after the ref below has moved on.)
   const saved = task?.submission?.content || "";
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   useEffect(() => {
     if (task === undefined) return;
-    setDraft((current) => {
-      const untouched = savedVersion.current === null || current === savedVersion.current;
-      if (!untouched && current !== saved) setTeammateSaved(true);
-      return untouched ? saved : current;
-    });
+    const previous = savedVersion.current;
+    const current = draftRef.current;
     savedVersion.current = saved;
+    if (previous === null || current.trim() === previous.trim()) setDraft(saved);
+    else if (current.trim() !== saved.trim()) setTeammateSaved(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved, task === undefined]);
 
@@ -79,15 +84,15 @@ export default function TaskPage() {
       const updating = Boolean(task.submission);
       await submitTask(taskId, currentUser.id, draft.trim());
       setTeammateSaved(false);
-      toast(updating ? "Submission updated. Ask for new feedback to see your progress." : "Work submitted");
+      toast(updating ? t("Submission updated. Ask for new feedback to see your progress.") : t("Work submitted"));
     } catch (err) {
-      toast(err.message || "Could not save your submission", "error");
+      toast(err.message || t("Could not save your submission"), "error");
     }
     setSaving(false);
   }
 
-  if (task === undefined) return <p className="muted">Loading…</p>;
-  if (task === null || task.teamId !== teamId) return <p>Task not found.</p>;
+  if (task === undefined) return <p className="muted">{t("Loading…")}</p>;
+  if (task === null || task.teamId !== teamId) return <p>{t("Task not found.")}</p>;
 
   const isMember = Boolean(currentUser && !isMentor && team?.memberIds.includes(currentUser.id));
   const isProjectMentor = Boolean(isMentor && project && project.mentorId === currentUser.id);
@@ -97,7 +102,7 @@ export default function TaskPage() {
   return (
     <div>
       <Link href={`/teams/${teamId}`} className="back">
-        ← Task board
+        {t("← Task board")}
       </Link>
 
       <div className="two-col">
@@ -106,14 +111,16 @@ export default function TaskPage() {
             <div className="eyebrow">{project?.title}</div>
             <h1>{task.title}</h1>
             <div className="row" style={{ marginBottom: 12 }}>
-              <span className="badge">{STATUS_LABEL[task.status]}</span>
+              <span className="badge">{t(STATUS_LABEL[task.status])}</span>
               <span className="muted small">
-                {task.assigneeIds.length ? `Assigned to ${task.assigneeIds.map(userName).join(", ")}` : "Nobody assigned yet"}
+                {task.assigneeIds.length
+                  ? t("Assigned to {names}", { names: task.assigneeIds.map(userName).join(", ") })
+                  : t("Nobody assigned yet")}
               </span>
             </div>
             <p>{task.description}</p>
             <div className="eyebrow" style={{ marginTop: 16 }}>
-              Mentor criteria for this task
+              {t("Mentor criteria for this task")}
             </div>
             <ul className="criteria-list">
               {criteria.map((c) => (
@@ -126,34 +133,36 @@ export default function TaskPage() {
           </section>
 
           <section className="card">
-            <h2>Submission</h2>
+            <h2>{t("Submission")}</h2>
             {task.submission && (
               <p className="muted small">
-                Last submitted by {userName(task.submission.submittedBy)} on{" "}
-                {new Date(task.submission.submittedAt).toLocaleString()}
+                {t("Last submitted by {name} on {date}", {
+                  name: userName(task.submission.submittedBy),
+                  date: new Date(task.submission.submittedAt).toLocaleString(),
+                })}
               </p>
             )}
             <form onSubmit={handleSubmit} className="stack">
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Write your team's work here, or paste a link (Figma, Google Doc, GitHub)."
+                placeholder={t("Write your team's work here, or paste a link (Figma, Google Doc, GitHub).")}
                 maxLength={MAX_SUBMISSION_CHARS}
                 disabled={!isMember}
-                aria-label="Submission"
+                aria-label={t("Submission")}
               />
               {isMember && (
                 <div className="row">
                   <button className="btn" disabled={saving || !draft.trim()}>
-                    {saving ? "Saving…" : task.submission ? "Update submission" : "Submit work"}
+                    {saving ? t("Saving…") : task.submission ? t("Update submission") : t("Submit work")}
                   </button>
                   <span className="muted small">
                     {draft.length} / {MAX_SUBMISSION_CHARS}
                   </span>
-                  {unsaved && <span className="badge badge-amber">Unsaved changes</span>}
+                  {unsaved && <span className="badge badge-amber">{t("Unsaved changes")}</span>}
                   {teammateSaved && (
                     <span className="row small">
-                      <span className="badge badge-amber">A teammate saved a newer version</span>
+                      <span className="badge badge-amber">{t("A teammate saved a newer version")}</span>
                       <button
                         type="button"
                         className="link-button"
@@ -162,7 +171,7 @@ export default function TaskPage() {
                           setTeammateSaved(false);
                         }}
                       >
-                        Load it
+                        {t("Load it")}
                       </button>
                     </span>
                   )}
@@ -195,14 +204,16 @@ export default function TaskPage() {
 
         <aside className="card">
           <div className="spread">
-            <h2>Contributions</h2>
+            <h2>{t("Contributions")}</h2>
             {contributions.length > 0 && (
-              <span className="badge">{contributions.reduce((sum, c) => sum + (Number(c.hoursSpent) || 0), 0)}h total</span>
+              <span className="badge">
+                {t("{h}h total", { h: contributions.reduce((sum, c) => sum + (Number(c.hoursSpent) || 0), 0) })}
+              </span>
             )}
           </div>
-          <p className="muted small">Record what you did, so the team and mentor can see who did what.</p>
+          <p className="muted small">{t("Record what you did, so the team and mentor can see who did what.")}</p>
           {contributions.length === 0 ? (
-            <p className="muted small">No contributions yet.</p>
+            <p className="muted small">{t("No contributions yet.")}</p>
           ) : (
             <ul className="list-plain">
               {contributions.map((c) => (

@@ -19,8 +19,11 @@ import {
 import { buildAttention } from "@/lib/attention";
 import { APP_TAGLINE } from "@/lib/config";
 import { timeAgo } from "@/lib/format";
+import { useT } from "@/components/LocaleProvider";
+import { FIELD_INFO } from "@/lib/assessment";
 
 function LearnerHome({ currentUser }) {
+  const t = useT();
   const [teams, setTeams] = useState(null);
 
   useEffect(() => {
@@ -30,10 +33,10 @@ function LearnerHome({ currentUser }) {
           const [project, tasks] = await Promise.all([getProject(team.projectId), getTasks(team.id)]);
           // "Up next": my task in progress first, then any open task nobody took yet.
           const next =
-            tasks.find((t) => t.status === "in_progress" && t.assigneeIds.includes(currentUser.id)) ||
-            tasks.find((t) => t.status !== "done" && t.assigneeIds.includes(currentUser.id)) ||
-            tasks.find((t) => t.status === "todo" && t.assigneeIds.length === 0);
-          return { ...team, project, done: tasks.filter((t) => t.status === "done").length, total: tasks.length, next };
+            tasks.find((item) => item.status === "in_progress" && item.assigneeIds.includes(currentUser.id)) ||
+            tasks.find((item) => item.status !== "done" && item.assigneeIds.includes(currentUser.id)) ||
+            tasks.find((item) => item.status === "todo" && item.assigneeIds.length === 0);
+          return { ...team, project, done: tasks.filter((item) => item.status === "done").length, total: tasks.length, next };
         })
       );
       setTeams(withProjects);
@@ -43,62 +46,65 @@ function LearnerHome({ currentUser }) {
   return (
     <div className="stack">
       <div>
-        <h1>Hi {currentUser.name.split(" ")[0]}</h1>
-        <p className="muted">{APP_TAGLINE}</p>
+        <h1>{t("Hi {name}", { name: currentUser.name.split(" ")[0] })}</h1>
+        <p className="muted">{t(APP_TAGLINE)}</p>
       </div>
 
       <ConnectionRequests />
 
       <section className="card hero">
         <div className="spread">
-          <div className="eyebrow">Your career assessment result</div>
+          <div className="eyebrow">{t("Your career assessment result")}</div>
           <Link href="/assessment" className="btn btn-secondary btn-small">
-            {currentUser.careerField ? "Retake assessment" : "Take the assessment"}
+            {currentUser.careerField ? t("Retake assessment") : t("Take the assessment")}
           </Link>
         </div>
         {currentUser.careerField ? (
           <>
-            <div className="muted">You are a good fit for</div>
+            <div className="muted">{t("You are a good fit for")}</div>
             <div className="career-field">
-              {currentUser.careerField}
+              {t(currentUser.careerField)}
               {currentUser.careerMatches?.[0] && (
-                <span className="career-percent">{currentUser.careerMatches[0].percent}% fit</span>
+                <span className="career-percent">{t("{percent}% fit", { percent: currentUser.careerMatches[0].percent })}</span>
               )}
             </div>
             {currentUser.careerMatches?.length > 1 && (
               <p className="small">
-                Also a good fit: {currentUser.careerMatches
+                {t("Also a good fit:")} {currentUser.careerMatches
                   .slice(1, 3)
-                  .map((m) => `${m.field} (${m.percent}%)`)
+                  .map((m) => `${t(m.field)} (${m.percent}%)`)
                   .join(", ")}
               </p>
             )}
             <p>
-              <strong>Why: </strong>
-              {currentUser.careerExplanation}
+              <strong>{t("Why:")} </strong>
+              {/* The fixed explanation (no AI key) is translatable; AI text is in the language it was written in. */}
+              {currentUser.careerExplanation === FIELD_INFO[currentUser.careerField]?.blurb
+                ? t(currentUser.careerExplanation)
+                : currentUser.careerExplanation}
             </p>
             <Link href="/projects" className="btn">
-              See projects that match
+              {t("See projects that match")}
             </Link>
           </>
         ) : (
           <>
-            <p>Rate 32 short work activities (about 5 minutes) and we will suggest the projects that fit you best.</p>
+            <p>{t("Rate 32 short work activities (about 5 minutes) and we will suggest the projects that fit you best.")}</p>
             <Link href="/assessment" className="btn">
-              Start the assessment
+              {t("Start the assessment")}
             </Link>
           </>
         )}
       </section>
 
       <section>
-        <h2 className="section-title">My teams</h2>
-        {teams === null && <p className="muted">Loading…</p>}
+        <h2 className="section-title">{t("My teams")}</h2>
+        {teams === null && <p className="muted">{t("Loading…")}</p>}
         {teams?.length === 0 && (
           <div className="card">
-            <p className="muted">You have not joined a project yet.</p>
+            <p className="muted">{t("You have not joined a project yet.")}</p>
             <Link href="/projects" className="btn btn-secondary">
-              Browse projects
+              {t("Browse projects")}
             </Link>
           </div>
         )}
@@ -106,11 +112,11 @@ function LearnerHome({ currentUser }) {
           {teams?.map((team) => (
             <Link key={team.id} href={`/teams/${team.id}`} className="card project-card">
               <div className="row">
-                <span className="badge badge-blue">{team.project?.field}</span>
-                {team.status === "completed" && <span className="badge badge-green">Completed</span>}
+                <span className="badge badge-blue">{team.project && t(team.project.field)}</span>
+                {team.status === "completed" && <span className="badge badge-green">{t("Completed")}</span>}
               </div>
               <h3>{team.project?.title}</h3>
-              <div className="bar" aria-label={`${team.done} of ${team.total} tasks done`}>
+              <div className="bar" aria-label={t("{done} of {total} tasks done", { done: team.done, total: team.total })}>
                 <div className="bar-fill" style={{ width: `${team.total ? (team.done / team.total) * 100 : 0}%` }} />
               </div>
               <span className="muted small">
@@ -118,7 +124,7 @@ function LearnerHome({ currentUser }) {
               </span>
               {team.next && team.status === "active" && (
                 <span className="small">
-                  <strong>Up next:</strong> {team.next.title}
+                  <strong>{t("Up next:")}</strong> {team.next.title}
                 </span>
               )}
             </Link>
@@ -130,6 +136,7 @@ function LearnerHome({ currentUser }) {
 }
 
 function MentorHome({ currentUser, userName }) {
+  const t = useT();
   const [rows, setRows] = useState(null);
 
   useEffect(() => {
@@ -145,7 +152,7 @@ function MentorHome({ currentUser, userName }) {
                 project,
                 tasks,
                 feedback,
-                done: tasks.filter((t) => t.status === "done").length,
+                done: tasks.filter((item) => item.status === "done").length,
                 total: tasks.length,
                 hasFinal: feedback.some((f) => f.kind === "final"),
               };
@@ -161,20 +168,22 @@ function MentorHome({ currentUser, userName }) {
   const allTeams = (rows || []).flatMap((r) => r.teams);
   const attention = buildAttention(allTeams);
   const stats = [
-    { label: "Projects", value: rows?.length ?? "–" },
-    { label: "Active teams", value: allTeams.filter((t) => t.status === "active").length },
-    { label: "Ready for final feedback", value: allTeams.filter((t) => t.status === "active" && t.total && t.done === t.total && !t.hasFinal).length },
-    { label: "Completed", value: allTeams.filter((t) => t.status === "completed").length },
+    { label: t("Projects"), value: rows?.length ?? "–" },
+    { label: t("Active teams"), value: allTeams.filter((team) => team.status === "active").length },
+    { label: t("Ready for final feedback"), value: allTeams.filter((team) => team.status === "active" && team.total && team.done === team.total && !team.hasFinal).length },
+    { label: t("Completed"), value: allTeams.filter((team) => team.status === "completed").length },
   ];
 
   return (
     <div className="stack">
       <div className="spread">
         <div>
-          <h1>Hi {currentUser.name.split(" ")[0]}</h1>
+          <h1>{t("Hi {name}", { name: currentUser.name.split(" ")[0] })}</h1>
           <p className="muted">
-            You are viewing as a mentor at {currentUser.company}. Learners appear by anonymous name only, so you
-            judge the work, not the person.
+            {t(
+              "You are viewing as a mentor at {company}. Learners appear by anonymous name only, so you judge the work, not the person.",
+              { company: currentUser.company }
+            )}
           </p>
         </div>
         <Link href="/projects/new" className="btn">
@@ -193,18 +202,22 @@ function MentorHome({ currentUser, userName }) {
         </div>
       )}
 
-      {rows === null && <p className="muted">Loading…</p>}
+      {rows === null && <p className="muted">{t("Loading…")}</p>}
       {rows && (
         <section className="card">
           <div className="spread">
-            <h2>Needs your attention</h2>
+            <h2>{t("Needs your attention")}</h2>
             <span className={attention.length ? "badge badge-amber" : "badge badge-green"}>
-              {attention.length ? `${attention.length} item${attention.length > 1 ? "s" : ""}` : "All clear"}
+              {attention.length
+                ? t(attention.length > 1 ? "{n} items" : "{n} item", { n: attention.length })
+                : t("All clear")}
             </span>
           </div>
           {attention.length === 0 ? (
             <p className="muted small">
-              No help requests, no struggling tasks, no teams waiting for final feedback. AI feedback is covering the rest.
+              {t(
+                "No help requests, no struggling tasks, no teams waiting for final feedback. AI feedback is covering the rest."
+              )}
             </p>
           ) : (
             <ul className="list-plain">
@@ -213,20 +226,24 @@ function MentorHome({ currentUser, userName }) {
                   <div className="spread">
                     <div>
                       <span className={item.kind === "help" ? "badge badge-amber" : "badge"}>
-                        {item.kind === "help" ? "Help request" : item.kind === "struggling" ? "Low AI score" : "Ready for final feedback"}
+                        {item.kind === "help"
+                          ? t("Help request")
+                          : item.kind === "struggling"
+                            ? t("Low AI score")
+                            : t("Ready for final feedback")}
                       </span>{" "}
                       <Link href={item.href}>
                         <strong>
                           {item.kind === "final"
-                            ? `${item.project?.title}: every task is done`
+                            ? t("{project}: every task is done", { project: item.project?.title })
                             : item.kind === "help"
-                              ? `${userName(item.userId)} on “${item.task.title}”`
-                              : `“${item.task.title}” scored ${item.lowest}/5 in its latest review`}
+                              ? t("{name} on “{task}”", { name: userName(item.userId), task: item.task.title })
+                              : t("“{task}” scored {score}/5 in its latest review", { task: item.task.title, score: item.lowest })}
                         </strong>
                       </Link>
                       {item.note && <div className="muted small clamp-2">{item.note}</div>}
                     </div>
-                    <span className="muted small">{timeAgo(item.at)}</span>
+                    <span className="muted small">{timeAgo(item.at, Date.now(), t)}</span>
                   </div>
                 </li>
               ))}
@@ -237,9 +254,11 @@ function MentorHome({ currentUser, userName }) {
 
       {rows?.length === 0 && (
         <div className="card">
-          <p className="muted">You have no projects yet. Turn a situation from your work into one in a few minutes.</p>
+          <p className="muted">
+            {t("You have no projects yet. Turn a situation from your work into one in a few minutes.")}
+          </p>
           <Link href="/projects/new" className="btn">
-            Create your first project
+            {t("Create your first project")}
           </Link>
         </div>
       )}
@@ -248,7 +267,7 @@ function MentorHome({ currentUser, userName }) {
         <section key={project.id} className="card">
           <div className="spread">
             <div>
-              <span className="badge badge-blue">{project.field}</span>
+              <span className="badge badge-blue">{t(project.field)}</span>
               <h2 style={{ marginTop: 8 }}>
                 <Link href={`/projects/${project.id}`} className="title-link">
                   {project.title}
@@ -257,7 +276,7 @@ function MentorHome({ currentUser, userName }) {
             </div>
           </div>
           {teams.length === 0 ? (
-            <p className="muted small">No team has joined yet.</p>
+            <p className="muted small">{t("No team has joined yet.")}</p>
           ) : (
             <ul className="list-plain">
               {teams.map((team, index) => (
@@ -265,7 +284,7 @@ function MentorHome({ currentUser, userName }) {
                   <div className="spread">
                     <div>
                       <Link href={`/teams/${team.id}`}>
-                        <strong>Team {index + 1}</strong>
+                        <strong>{t("Team {n}", { n: index + 1 })}</strong>
                       </Link>
                       <div className="muted small">{team.memberIds.map(userName).join(", ")}</div>
                     </div>
@@ -274,10 +293,10 @@ function MentorHome({ currentUser, userName }) {
                         {team.done} of {team.total} tasks done
                       </span>
                       <span className={team.hasFinal ? "badge badge-green" : "badge badge-amber"}>
-                        {team.hasFinal ? "Final feedback given" : "Final feedback pending"}
+                        {team.hasFinal ? t("Final feedback given") : t("Final feedback pending")}
                       </span>
                       <Link href={`/teams/${team.id}`} className="btn btn-secondary btn-small">
-                        Open team →
+                        {t("Open team →")}
                       </Link>
                     </span>
                   </div>
@@ -293,15 +312,16 @@ function MentorHome({ currentUser, userName }) {
 
 // Signed-out visitors (real accounts): what MAntor is, and three ways in.
 function Landing() {
+  const t = useT();
   const steps = [
-    ["Find your field", "A 5-minute interest assessment matches you to 8 career fields."],
-    ["Join a team project", "Realistic workplace scenarios written by industry mentors."],
-    ["Get feedback that counts", "AI reviews your work against the mentor's own standard, within minutes."],
+    [t("Find your field"), t("A 5-minute interest assessment matches you to 8 career fields.")],
+    [t("Join a team project"), t("Realistic workplace scenarios written by industry mentors.")],
+    [t("Get feedback that counts"), t("AI reviews your work against the mentor's own standard, within minutes.")],
   ];
   return (
     <div className="stack">
       <section className="card stack landing">
-        <h2>Build real experience before your first job</h2>
+        <h2>{t("Build real experience before your first job")}</h2>
         <div className="analysis-grid">
           {steps.map(([title, text], i) => (
             <div key={title}>
@@ -314,28 +334,31 @@ function Landing() {
         </div>
         <div className="row">
           <Link href="/signup" className="btn">
-            Create a free account
+            {t("Create a free account")}
           </Link>
           <Link href="/login" className="btn btn-secondary">
-            Log in
+            {t("Log in")}
           </Link>
           <button className="btn btn-ghost" onClick={startDemo}>
-            Try the demo
+            {t("Try the demo")}
           </button>
         </div>
         <p className="muted small">
-          The demo opens a private sandbox with sample learners and mentors. You can switch between them to see both sides.
+          {t(
+            "The demo opens a private sandbox with sample learners and mentors. You can switch between them to see both sides."
+          )}
         </p>
       </section>
       <div className="row">
-        <Link href="/projects">Browse the projects →</Link>
-        <Link href="/about">About {"MAntor"} →</Link>
+        <Link href="/projects">{t("Browse the projects →")}</Link>
+        <Link href="/about">{t("About MAntor →")}</Link>
       </div>
     </div>
   );
 }
 
 export default function HomePage() {
+  const t = useT();
   const { currentUser, isMentor, userName, loaded, dataError, users, signedOut } = useUser();
   return (
     <>
@@ -345,16 +368,16 @@ export default function HomePage() {
       ) : !currentUser ? (
         loaded && (dataError || users.length === 0) ? (
           <div className="card stack">
-            <h2>{dataError ? "The app cannot read the database" : "No data yet"}</h2>
-            <p>{dataError || "Load the demo users, mentors and projects to get started."}</p>
+            <h2>{dataError ? t("The app cannot read the database") : t("No data yet")}</h2>
+            <p>{dataError || t("Load the demo users, mentors and projects to get started.")}</p>
             <div>
               <Link href="/setup" className="btn">
-                Go to setup
+                {t("Go to setup")}
               </Link>
             </div>
           </div>
         ) : (
-          <p className="muted">Loading…</p>
+          <p className="muted">{t("Loading…")}</p>
         )
       ) : isMentor ? (
         <MentorHome currentUser={currentUser} userName={userName} />

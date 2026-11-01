@@ -8,9 +8,11 @@ import NotificationBell from "./NotificationBell";
 import { APP_NAME } from "@/lib/config";
 import { exitDemo } from "@/lib/session";
 import { useUser } from "./UserProvider";
+import { useLocale } from "./LocaleProvider";
 
 export default function Header() {
   const pathname = usePathname();
+  const { t, locale, setLocale } = useLocale();
   const { mode, users, currentUser, isMentor, isAdmin, switchUser, userName, loaded, dataError, signedOut } = useUser();
   const learners = users.filter((u) => u.role === "learner");
   const mentors = users.filter((u) => u.role === "mentor");
@@ -25,12 +27,12 @@ export default function Header() {
   }, []);
 
   const nav = [
-    { href: "/", label: "Home" },
-    ...(isMentor ? [] : [{ href: "/assessment", label: "Assessment" }]),
-    { href: "/projects", label: "Projects" },
-    ...(isMentor ? [{ href: "/projects/new", label: "New project" }] : []),
-    ...(!isMentor && currentUser ? [{ href: `/portfolio/${currentUser.id}`, label: "Portfolio" }] : []),
-    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
+    { href: "/", label: t("Home") },
+    ...(isMentor ? [] : [{ href: "/assessment", label: t("Assessment") }]),
+    { href: "/projects", label: t("Projects") },
+    ...(isMentor ? [{ href: "/projects/new", label: t("New project") }] : []),
+    ...(!isMentor && currentUser ? [{ href: `/portfolio/${currentUser.id}`, label: t("Portfolio") }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: t("Admin") }] : []),
   ];
   // The most specific matching link is the active one ("/projects/new" beats "/projects").
   const active = nav
@@ -53,40 +55,40 @@ export default function Header() {
         </nav>
         <div className="header-right">
           {mode === "demo" && (
-            <span className="badge badge-amber" title="Sample data in this browser only">
-              Demo
+            <span className="badge badge-amber" title={t("Sample data in this browser only")}>
+              {t("Demo")}
             </span>
           )}
           {isMentor && (
-            <span className="badge badge-blue" title="Learners appear by anonymous name until they choose to share it">
-              Mentor view
+            <span className="badge badge-blue" title={t("Learners appear by anonymous name until they choose to share it")}>
+              {t("Mentor view")}
             </span>
           )}
           {/* Only worth showing when AI answers are simulated (no API key on the server). */}
-          {ai === false && <span className="badge badge-amber">AI: Simulated</span>}
-          {mode === "local" && <span className="badge badge-amber">Demo data</span>}
+          {ai === false && <span className="badge badge-amber">{t("AI: Simulated")}</span>}
+          {mode === "local" && <span className="badge badge-amber">{t("Demo data")}</span>}
           {currentUser && <NotificationBell />}
 
           {/* Demo: pick which sample person you are. Mentors see anonymous names here too. */}
           {mode !== "auth" && users.length > 0 && (
             <label className="user-switch">
-              <span className="muted small viewing-as">Viewing as</span>
+              <span className="muted small viewing-as">{t("Viewing as")}</span>
               <select
                 value={currentUser?.id || ""}
                 onChange={(e) => switchUser(e.target.value)}
-                aria-label="Switch demo user"
+                aria-label={t("Switch demo user")}
               >
-                <optgroup label="Learners">
+                <optgroup label={t("Learners")}>
                   {learners.map((u) => (
                     <option key={u.id} value={u.id}>
                       {userName(u.id)}
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Mentors">
+                <optgroup label={t("Mentors")}>
                   {mentors.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} (mentor)
+                      {u.name} ({t("mentor")})
                     </option>
                   ))}
                 </optgroup>
@@ -95,13 +97,23 @@ export default function Header() {
           )}
           {mode === "demo" && (
             <button className="btn btn-ghost btn-small" onClick={exitDemo}>
-              Exit demo
+              {t("Exit demo")}
             </button>
           )}
 
+          <button
+            type="button"
+            className="lang-switch"
+            onClick={() => setLocale(locale === "en" ? "zh-TW" : "en")}
+            aria-label={locale === "en" ? "切換成繁體中文" : "Switch to English"}
+            title={locale === "en" ? "切換成繁體中文" : "Switch to English"}
+          >
+            {locale === "en" ? "中文" : "EN"}
+          </button>
+
           {/* Real accounts */}
           {mode === "auth" && currentUser && (
-            <Link href="/account" className="account-chip" title="Your account">
+            <Link href="/account" className="account-chip" title={t("Your account")}>
               <Avatar id={currentUser.id} size={32} />
               <span className="account-name">{currentUser.name}</span>
             </Link>
@@ -109,10 +121,10 @@ export default function Header() {
           {signedOut && (
             <>
               <Link href="/login" className="btn btn-ghost btn-small">
-                Log in
+                {t("Log in")}
               </Link>
               <Link href="/signup" className="btn btn-small">
-                Sign up
+                {t("Sign up")}
               </Link>
             </>
           )}
@@ -121,14 +133,15 @@ export default function Header() {
       {pathname !== "/setup" && dataError && (
         <div className="data-banner" role="alert">
           <div className="container">
-            <strong>Database problem:</strong> {dataError} <Link href="/setup">Open setup →</Link>
+            <strong>{t("Database problem:")}</strong> {dataError} <Link href="/setup">{t("Open setup →")}</Link>
           </div>
         </div>
       )}
       {pathname !== "/setup" && mode !== "auth" && !dataError && loaded && users.length === 0 && (
         <div className="data-banner" role="status">
           <div className="container">
-            <strong>The database is empty.</strong> <Link href="/setup">Load the demo data on the setup page →</Link>
+            <strong>{t("The database is empty.")}</strong>{" "}
+            <Link href="/setup">{t("Load the demo data on the setup page →")}</Link>
           </div>
         </div>
       )}

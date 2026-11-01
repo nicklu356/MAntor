@@ -9,6 +9,7 @@ import PhotoPicker from "./PhotoPicker";
 import ProfileForm from "./ProfileForm";
 import { useUser } from "./UserProvider";
 import { startDemo } from "@/lib/session";
+import { useT } from "./LocaleProvider";
 
 const isPublic = (path) =>
   path === "/" ||
@@ -21,6 +22,7 @@ const isPublic = (path) =>
   (/^\/projects\/[^/]+$/.test(path) && path !== "/projects/new");
 
 export default function AuthGate({ children }) {
+  const t = useT();
   const pathname = usePathname();
   const { signedOut, currentUser, profileComplete } = useUser();
 
@@ -29,15 +31,16 @@ export default function AuthGate({ children }) {
     return (
       <div className="card stack" style={{ maxWidth: 760 }}>
         <div>
-          <div className="eyebrow">One last step</div>
-          <h1>Complete your profile</h1>
+          <div className="eyebrow">{t("One last step")}</div>
+          <h1>{t("Complete your profile")}</h1>
           <p className="muted">
-            The basics, like the first page of a job application. It takes a minute, and you can change it later on your
-            Account page.
+            {t(
+              "The basics, like the first page of a job application. It takes a minute, and you can change it later on your Account page."
+            )}
           </p>
         </div>
         <PhotoPicker />
-        <ProfileForm submitLabel="Save and continue" />
+        <ProfileForm submitLabel={t("Save and continue")} />
       </div>
     );
   }
@@ -46,17 +49,19 @@ export default function AuthGate({ children }) {
 
   return (
     <div className="card stack" style={{ maxWidth: 560 }}>
-      <h1>Log in to continue</h1>
-      <p className="muted">You need an account to see this page. Or look around with the sample learners and mentors first.</p>
+      <h1>{t("Log in to continue")}</h1>
+      <p className="muted">
+        {t("You need an account to see this page. Or look around with the sample learners and mentors first.")}
+      </p>
       <div className="row">
         <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="btn">
-          Log in
+          {t("Log in")}
         </Link>
         <Link href="/signup" className="btn btn-secondary">
-          Sign up
+          {t("Sign up")}
         </Link>
         <button className="btn btn-ghost" onClick={startDemo}>
-          Try the demo
+          {t("Try the demo")}
         </button>
       </div>
     </div>

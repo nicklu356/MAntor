@@ -12,6 +12,7 @@ import TeamMembers from "@/components/TeamMembers";
 import { useUser } from "@/components/UserProvider";
 import { getProject, leaveTeam, updateTask } from "@/lib/db";
 import { useLiveDoc, useLiveList } from "@/lib/live";
+import { useT } from "@/components/LocaleProvider";
 
 const COLUMNS = [
   { status: "todo", label: "To do" },
@@ -21,6 +22,7 @@ const COLUMNS = [
 const ORDER = COLUMNS.map((c) => c.status);
 
 export default function TeamPage() {
+  const t = useT();
   const { id } = useParams();
   const router = useRouter();
   const { currentUser, isMentor, userName } = useUser();
@@ -48,7 +50,7 @@ export default function TeamPage() {
 
   // Drag a card to another column (the arrow buttons do the same for keyboard users).
   async function drop(status) {
-    const task = tasks.find((t) => t.id === dragging);
+    const task = tasks.find((item) => item.id === dragging);
     setDragging(null);
     setDropTarget(null);
     if (!task || task.status === status) return;
@@ -70,71 +72,71 @@ export default function TeamPage() {
       await leaveTeam(team.id, currentUser.id);
       router.push("/");
     } catch (e) {
-      setLeaveError(e.message || "Could not leave the team");
+      setLeaveError(e.message || t("Could not leave the team"));
       setLeaving(false);
     }
   }
 
-  if (team === undefined) return <p className="muted">Loading…</p>;
-  if (team === null) return <p>Team not found.</p>;
+  if (team === undefined) return <p className="muted">{t("Loading…")}</p>;
+  if (team === null) return <p>{t("Team not found.")}</p>;
   if (team.status === "disbanded") {
     return (
       <div>
         <Link href="/" className="back">
-          ← Home
+          {t("← Home")}
         </Link>
-        <p className="card muted">This team was disbanded because everyone left.</p>
+        <p className="card muted">{t("This team was disbanded because everyone left.")}</p>
       </div>
     );
   }
 
   const isMember = Boolean(currentUser && !isMentor && team.memberIds.includes(currentUser.id));
   const isProjectMentor = Boolean(isMentor && project && project.mentorId === currentUser.id);
-  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const doneCount = tasks.filter((item) => item.status === "done").length;
   const canLeave = isMember && team.status === "active";
 
   return (
     <div>
       <Link href="/" className="back">
-        ← Home
+        {t("← Home")}
       </Link>
 
       <div className="spread" style={{ marginBottom: 20 }}>
         <div>
-          <div className="eyebrow">{project?.field}</div>
+          <div className="eyebrow">{project && t(project.field)}</div>
           <h1>{project?.title}</h1>
           <p className="muted small">
-            Team: {team.memberIds.map(userName).join(", ")} · {doneCount} of {tasks.length} tasks done ·{" "}
-            {team.status}
+            {t("Team:")} {team.memberIds.map(userName).join(", ")} ·{" "}
+            {t("{done} of {total} tasks done", { done: doneCount, total: tasks.length })} · {t(team.status)}
           </p>
         </div>
         <div className="row">
           {canLeave && !confirmLeave && (
             <button className="btn btn-danger" onClick={() => setConfirmLeave(true)}>
-              Leave team
+              {t("Leave team")}
             </button>
           )}
           <Link href={`/projects/${team.projectId}`} className="btn btn-ghost">
-            Project brief
+            {t("Project brief")}
           </Link>
         </div>
       </div>
 
       {canLeave && confirmLeave && (
         <div className="card stack" style={{ marginBottom: 20 }}>
-          <strong>Leave this team?</strong>
+          <strong>{t("Leave this team?")}</strong>
           <p className="muted small">
-            You will lose access to this team&apos;s board and your personal analysis. Work you already
-            submitted and your recorded contributions stay with the team. You can join the project again
-            later, but you may be placed in a different team.
+            {t(
+              "You will lose access to this team's board and your personal analysis. Work you already submitted and your recorded contributions stay with the team. You can join the project again later, but you may be placed in a different team."
+            )}
           </p>
           {leaveError && <p className="error">{leaveError}</p>}
           <div className="row">
             <button className="btn btn-danger-solid" onClick={handleLeave} disabled={leaving}>
-              {leaving ? "Leaving…" : "Yes, leave team"}
+              {leaving ? t("Leaving…") : t("Yes, leave team")}
             </button>
             <button className="btn btn-ghost" onClick={() => setConfirmLeave(false)} disabled={leaving}>
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>
@@ -142,21 +144,21 @@ export default function TeamPage() {
 
       {isProjectMentor && (
         <p className="card muted">
-          You are this project&apos;s mentor. Learners appear by anonymous name, so you judge the work, not the person.
+          {t("You are this project's mentor. Learners appear by anonymous name, so you judge the work, not the person.")}
         </p>
       )}
       {isMentor && !isProjectMentor && (
-        <p className="card muted">You are viewing another mentor&apos;s project (read only).</p>
+        <p className="card muted">{t("You are viewing another mentor's project (read only).")}</p>
       )}
       {!isMentor && !isMember && (
         <p className="card muted">
-          You are not in this team. Switch learner in the header or join the project to take part.
+          {t("You are not in this team. Switch learner in the header or join the project to take part.")}
         </p>
       )}
 
       <div className="board">
         {COLUMNS.map((col) => {
-          const colTasks = tasks.filter((t) => t.status === col.status);
+          const colTasks = tasks.filter((item) => item.status === col.status);
           return (
             <section
               key={col.status}
@@ -173,10 +175,10 @@ export default function TeamPage() {
               }}
             >
               <div className="column-head">
-                <span>{col.label}</span>
+                <span>{t(col.label)}</span>
                 <span className="badge">{colTasks.length}</span>
               </div>
-              {colTasks.length === 0 && <p className="muted small column-empty">{isMember ? "Drop a task here" : "No tasks"}</p>}
+              {colTasks.length === 0 && <p className="muted small column-empty">{isMember ? t("Drop a task here") : t("No tasks")}</p>}
               {colTasks.map((task) => (
                 <article
                   key={task.id}
@@ -193,10 +195,10 @@ export default function TeamPage() {
                 >
                   <Link href={`/teams/${team.id}/tasks/${task.id}`}>{task.title}</Link>
                   <span className="muted small">
-                    {task.assigneeIds.length ? task.assigneeIds.map(userName).join(", ") : "Nobody assigned"}
+                    {task.assigneeIds.length ? task.assigneeIds.map(userName).join(", ") : t("Nobody assigned")}
                   </span>
                   <div className="row">
-                    {task.submission && <span className="badge badge-green">Submitted</span>}
+                    {task.submission && <span className="badge badge-green">{t("Submitted")}</span>}
                   </div>
                   {isMember && (
                     <div className="row">
@@ -204,7 +206,7 @@ export default function TeamPage() {
                         className="btn btn-ghost btn-small"
                         onClick={() => move(task, -1)}
                         disabled={task.status === ORDER[0]}
-                        aria-label="Move left"
+                        aria-label={t("Move left")}
                       >
                         ←
                       </button>
@@ -212,12 +214,12 @@ export default function TeamPage() {
                         className="btn btn-ghost btn-small"
                         onClick={() => move(task, 1)}
                         disabled={task.status === ORDER[ORDER.length - 1]}
-                        aria-label="Move right"
+                        aria-label={t("Move right")}
                       >
                         →
                       </button>
                       <button className="btn btn-secondary btn-small" onClick={() => toggleAssign(task)}>
-                        {task.assigneeIds.includes(currentUser.id) ? "Unassign me" : "Assign me"}
+                        {task.assigneeIds.includes(currentUser.id) ? t("Unassign me") : t("Assign me")}
                       </button>
                     </div>
                   )}
@@ -230,7 +232,7 @@ export default function TeamPage() {
 
       {isMember && (
         <p className="muted small" style={{ marginTop: 8 }}>
-          Tip: drag cards between columns, or use the arrows.
+          {t("Tip: drag cards between columns, or use the arrows.")}
         </p>
       )}
 

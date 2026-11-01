@@ -7,8 +7,10 @@ import { useUser } from "@/components/UserProvider";
 import { MAX_COMMENT_CHARS } from "@/lib/config";
 import { addComment } from "@/lib/db";
 import { useLiveList } from "@/lib/live";
+import { useT } from "@/components/LocaleProvider";
 
 export default function CommentThread({ taskId, teamId, canPost }) {
+  const t = useT();
   const { currentUser, users, userName } = useUser();
   // Live: new messages from teammates appear without reloading.
   const comments = useLiveList("comments", "taskId", taskId) || [];
@@ -28,16 +30,16 @@ export default function CommentThread({ taskId, teamId, canPost }) {
 
   return (
     <section className="card">
-      <h2>Team discussion</h2>
+      <h2>{t("Team discussion")}</h2>
       {comments.length === 0 ? (
-        <p className="muted small">No messages yet.</p>
+        <p className="muted small">{t("No messages yet.")}</p>
       ) : (
         <ul className="list-plain">
           {comments.map((c) => (
             <li key={c.id}>
               <div className="row">
                 <strong>{userName(c.userId)}</strong>
-                {roleOf(c.userId) === "mentor" && <span className="badge badge-blue">Mentor</span>}
+                {roleOf(c.userId) === "mentor" && <span className="badge badge-blue">{t("Mentor")}</span>}
                 <span className="muted small">{new Date(c.createdAt).toLocaleString()}</span>
               </div>
               <div className="pre">{c.text}</div>
@@ -51,13 +53,13 @@ export default function CommentThread({ taskId, teamId, canPost }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={MAX_COMMENT_CHARS}
-            placeholder="Write a message to the team…"
+            placeholder={t("Write a message to the team…")}
             style={{ minHeight: 70 }}
-            aria-label="Message"
+            aria-label={t("Message")}
           />
           <div>
             <button className="btn btn-secondary" disabled={saving || !text.trim()}>
-              {saving ? "Sending…" : "Send"}
+              {saving ? t("Sending…") : t("Send")}
             </button>
           </div>
         </form>

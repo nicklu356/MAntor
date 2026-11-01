@@ -8,8 +8,10 @@ import { ScoreDots } from "@/components/FeedbackPanel";
 import { MAX_FEEDBACK_CHARS } from "@/lib/config";
 import { addFinalFeedback } from "@/lib/db";
 import { useLiveList } from "@/lib/live";
+import { useT } from "@/components/LocaleProvider";
 
 export default function FinalFeedback({ team, project, tasks, canGive, onSaved }) {
+  const t = useT();
   const { users, currentUser } = useUser();
   const [scores, setScores] = useState({});
   const [comments, setComments] = useState({});
@@ -24,7 +26,7 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
 
   if (latest === undefined || !project) return null;
 
-  const openTasks = tasks.filter((t) => t.status !== "done").length;
+  const openTasks = tasks.filter((item) => item.status !== "done").length;
   const criteriaName = (id) => project.criteria.find((c) => c.id === id)?.name || id;
   const author = latest ? users.find((u) => u.id === latest.authorId) : null;
 
@@ -50,19 +52,19 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
       setComments({});
       onSaved?.();
     } catch (err) {
-      setError(err.message || "Could not save feedback");
+      setError(err.message || t("Could not save feedback"));
     }
     setSaving(false);
   }
 
   return (
     <section className="card" style={{ marginTop: 24 }}>
-      <h2>Mentor final feedback</h2>
+      <h2>{t("Mentor final feedback")}</h2>
 
       {latest ? (
         <div>
           <div className="row" style={{ marginBottom: 8 }}>
-            <span className="badge badge-blue">Mentor feedback</span>
+            <span className="badge badge-blue">{t("Mentor feedback")}</span>
             {author && (
               <span className="muted small">
                 {author.name} · {author.company}
@@ -86,7 +88,7 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
       ) : (
         !canGive && (
           <p className="muted">
-            Your mentor will leave final feedback when the project is finished. It appears here.
+            {t("Your mentor will leave final feedback when the project is finished. It appears here.")}
           </p>
         )
       )}
@@ -94,11 +96,16 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
       {canGive && (
         <form onSubmit={handleSubmit} className="stack" style={{ marginTop: latest ? 20 : 8 }}>
           <div>
-            <strong>{latest ? "Update final feedback" : "Give final feedback"}</strong>
+            <strong>{latest ? t("Update final feedback") : t("Give final feedback")}</strong>
             <p className="muted small">
-              You see learners by anonymous name only, so your feedback is about the work.
+              {t("You see learners by anonymous name only, so your feedback is about the work.")}
               {openTasks > 0 &&
-                ` ${openTasks} task${openTasks > 1 ? "s are" : " is"} still open: you can give feedback now, but the team is only marked completed when every task is done.`}
+                ` ${t(
+                  openTasks > 1
+                    ? "{n} tasks are still open: you can give feedback now, but the team is only marked completed when every task is done."
+                    : "{n} task is still open: you can give feedback now, but the team is only marked completed when every task is done.",
+                  { n: openTasks }
+                )}`}
             </p>
           </div>
           {project.criteria.map((c) => (
@@ -110,7 +117,7 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
               <select
                 value={scores[c.id] || "3"}
                 onChange={(e) => setScores({ ...scores, [c.id]: e.target.value })}
-                aria-label={`Score for ${c.name}`}
+                aria-label={t("Score for {name}", { name: c.name })}
               >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
@@ -122,25 +129,25 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
                 value={comments[c.id] || ""}
                 onChange={(e) => setComments({ ...comments, [c.id]: e.target.value })}
                 maxLength={300}
-                placeholder="Optional comment for this criterion"
+                placeholder={t("Optional comment for this criterion")}
                 style={{ gridColumn: "1 / -1" }}
-                aria-label={`Comment for ${c.name}`}
+                aria-label={t("Comment for {name}", { name: c.name })}
               />
             </div>
           ))}
           <label className="field">
-            Overall feedback
+            {t("Overall feedback")}
             <textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               maxLength={MAX_FEEDBACK_CHARS}
-              placeholder="What went well, and the one thing to work on next."
+              placeholder={t("What went well, and the one thing to work on next.")}
             />
           </label>
           {error && <p className="error">{error}</p>}
           <div>
             <button className="btn" disabled={saving || !summary.trim()}>
-              {saving ? "Saving…" : latest ? "Update final feedback" : "Save final feedback"}
+              {saving ? t("Saving…") : latest ? t("Update final feedback") : t("Save final feedback")}
             </button>
           </div>
         </form>

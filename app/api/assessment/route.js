@@ -2,6 +2,7 @@
 // The score itself is calculated in the browser (lib/assessment.js).
 // Without an API key, or if the AI call fails, a fixed explanation is returned.
 import { FIELDS, FIELD_INFO, RIASEC } from "@/lib/assessment";
+import { LOCALES, aiLanguage } from "@/lib/i18n";
 import {
   DATA_RULE,
   askText,
@@ -22,6 +23,7 @@ export async function POST(request) {
   if (parsed.error) return Response.json({ error: parsed.error }, { status: parsed.status });
 
   const { field, answers, runnerUp, hollandCode } = parsed.body || {};
+  const locale = LOCALES.includes(parsed.body?.locale) ? parsed.body.locale : "en";
   if (!FIELDS.includes(field)) {
     return Response.json({ error: "Unknown career field" }, { status: 400 });
   }
@@ -50,7 +52,7 @@ export async function POST(request) {
 
   try {
     const text = await askText({
-      system: SYSTEM_PROMPT,
+      system: `${SYSTEM_PROMPT}\n${aiLanguage(locale)}`,
       messages: [
         {
           role: "user",

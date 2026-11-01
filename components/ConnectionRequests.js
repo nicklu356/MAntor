@@ -6,8 +6,10 @@ import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { respondToConnection } from "@/lib/db";
+import { useT } from "@/components/LocaleProvider";
 
 export default function ConnectionRequests() {
+  const t = useT();
   const toast = useToast();
   const { users, connections, refreshConnections, currentUser } = useUser();
   const [busy, setBusy] = useState(null);
@@ -23,34 +25,39 @@ export default function ConnectionRequests() {
       // Accepting shares the learner's own name with this mentor only.
       await respondToConnection(c.id, accept, currentUser?.name, currentUser?.photo);
       await refreshConnections();
-      toast(accept ? `${mentor(c.mentorId)?.name} can now see your name` : "Request declined. You stay anonymous.");
+      toast(
+        accept
+          ? t("{name} can now see your name", { name: mentor(c.mentorId)?.name })
+          : t("Request declined. You stay anonymous.")
+      );
     } catch (e) {
-      toast(e.message || "Could not save your answer", "error");
+      toast(e.message || t("Could not save your answer"), "error");
     }
     setBusy(null);
   }
 
   return (
     <section id="requests" className="card">
-      <h2>Mentor connections</h2>
+      <h2>{t("Mentor connections")}</h2>
       {pending.map((c) => {
         const m = mentor(c.mentorId);
         return (
           <div key={c.id} className="request">
             <p>
               <strong>{m?.name}</strong>
-              {m?.company && <> from {m.company}</>} liked your work and would like to know who you are.
+              {m?.company && <> {t("from {company}", { company: m.company })}</>}{" "}
+              {t("liked your work and would like to know who you are.")}
             </p>
             {c.message && <blockquote className="quote">{c.message}</blockquote>}
             <p className="muted small">
-              Accepting shows your real name to this mentor only. Other mentors still see your anonymous name.
+              {t("Accepting shows your real name to this mentor only. Other mentors still see your anonymous name.")}
             </p>
             <div className="row">
               <button className="btn" onClick={() => respond(c, true)} disabled={busy === c.id}>
-                Share my name
+                {t("Share my name")}
               </button>
               <button className="btn btn-ghost" onClick={() => respond(c, false)} disabled={busy === c.id}>
-                Stay anonymous
+                {t("Stay anonymous")}
               </button>
             </div>
           </div>
@@ -58,7 +65,7 @@ export default function ConnectionRequests() {
       })}
       {accepted.length > 0 && (
         <p className="muted small" style={{ marginTop: pending.length ? 12 : 0 }}>
-          Connected with {accepted.map((c) => mentor(c.mentorId)?.name).filter(Boolean).join(", ")}.
+          {t("Connected with {names}.", { names: accepted.map((c) => mentor(c.mentorId)?.name).filter(Boolean).join(", ") })}
         </p>
       )}
     </section>

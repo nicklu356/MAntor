@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ConnectionRequests from "@/components/ConnectionRequests";
+import { startDemo } from "@/lib/session";
 import Hero from "@/components/Hero";
 import { useUser } from "@/components/UserProvider";
 import {
@@ -290,12 +291,58 @@ function MentorHome({ currentUser, userName }) {
   );
 }
 
+// Signed-out visitors (real accounts): what MAntor is, and three ways in.
+function Landing() {
+  const steps = [
+    ["Find your field", "A 5-minute interest assessment matches you to 8 career fields."],
+    ["Join a team project", "Realistic workplace scenarios written by industry mentors."],
+    ["Get feedback that counts", "AI reviews your work against the mentor's own standard, within minutes."],
+  ];
+  return (
+    <div className="stack">
+      <section className="card stack landing">
+        <h2>Build real experience before your first job</h2>
+        <div className="analysis-grid">
+          {steps.map(([title, text], i) => (
+            <div key={title}>
+              <div className="eyebrow">
+                {i + 1}. {title}
+              </div>
+              <p className="small">{text}</p>
+            </div>
+          ))}
+        </div>
+        <div className="row">
+          <Link href="/signup" className="btn">
+            Create a free account
+          </Link>
+          <Link href="/login" className="btn btn-secondary">
+            Log in
+          </Link>
+          <button className="btn btn-ghost" onClick={startDemo}>
+            Try the demo
+          </button>
+        </div>
+        <p className="muted small">
+          The demo opens a private sandbox with sample learners and mentors. You can switch between them to see both sides.
+        </p>
+      </section>
+      <div className="row">
+        <Link href="/projects">Browse the projects →</Link>
+        <Link href="/about">About {"MAntor"} →</Link>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
-  const { currentUser, isMentor, userName, loaded, dataError, users } = useUser();
+  const { currentUser, isMentor, userName, loaded, dataError, users, signedOut } = useUser();
   return (
     <>
       <Hero />
-      {!currentUser ? (
+      {signedOut ? (
+        <Landing />
+      ) : !currentUser ? (
         loaded && (dataError || users.length === 0) ? (
           <div className="card stack">
             <h2>{dataError ? "The app cannot read the database" : "No data yet"}</h2>

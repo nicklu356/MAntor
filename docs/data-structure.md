@@ -49,6 +49,8 @@ users (learners and mentors)
 | `comments` | Team discussion under a task | ✅ Used |
 | `analyses` | AI personal analysis and course suggestions | ✅ Used |
 | `connections` | A mentor's request to learn who a learner is, and the answer | ✅ Used |
+| `profiles` | A user's private real name and email (real accounts) | ✅ Used |
+| `teamNames` | Real names inside one team, visible to its members only (real accounts) | ✅ Used |
 
 ---
 
@@ -56,9 +58,9 @@ users (learners and mentors)
 
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
-| `id` | string | User id | `"user_001"` |
+| `id` | string | User id (with real accounts: the Firebase Authentication uid) | `"user_001"` |
 | `role` | string | `"learner"` or `"mentor"` | `"learner"` |
-| `name` | string | Real name | `"Mia Chen"` |
+| `name` | string | Public name. Demo learners and mentors have one; with real accounts only mentors do (a learner's name is in `profiles`) | `"Grace Walker"` |
 | `anonymousName` | string | Anonymous name, the only name mentors see | `"Learner #A3F"` |
 | `company` | string | Mentor's company (mentors only) | `"Northwind Digital"` |
 | `careerField` | string | Best match from the career assessment (learners only) | `"UX Design"` |
@@ -69,6 +71,8 @@ users (learners and mentors)
 | `careerConfidence` | string | `"high"`, `"medium"` (near tie) or `"low"` (flat or mostly negative answers) | `"high"` |
 | `careerNotes` | array of string | Why the confidence is lower, shown on the result | |
 | `assessedAt` | string | When the assessment was taken | |
+| `admin` | boolean | Can open the Admin page. Only set in the Firebase console | `true` |
+| `mentorRequest` | object or null | Application to become a mentor: `name`, `company`, `note`, `at`, `declinedAt` | |
 | `createdAt` | string | Created time | |
 
 * 🔒 **Anonymity:** mentor screens show `anonymousName`, never `name`
@@ -256,6 +260,18 @@ users (learners and mentors)
 
 * 🔒 Mentors see a learner's real `name` only after that learner accepts **their** request. Other mentors still see `anonymousName`
 * 🔁 A declined request can be sent again later
+
+---
+
+## 10. 🔐 `profiles` and `teamNames` (real accounts)
+
+| Collection | Document id | Fields | Who can read it |
+|------------|-------------|--------|-----------------|
+| `profiles` | user id | `name`, `email`, `createdAt` | Only that user |
+| `teamNames` | team id | one field per member: `{ "<uid>": "Alice Wong" }` | Only that team's members |
+
+* Accepting a mentor's connection request copies the learner's name into the connection (`learnerName`), so only that mentor can see it
+* The rules for every collection are in `firestore.rules`
 
 ---
 

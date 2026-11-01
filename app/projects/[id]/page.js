@@ -10,7 +10,7 @@ import { getProject, getTeamsForProject, getTeamsForUser, getUser, joinProject }
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { currentUser, isMentor, userName } = useUser();
+  const { mode, currentUser, isMentor, userName, signedOut } = useUser();
   const [project, setProject] = useState(undefined);
   const [mentor, setMentor] = useState(null);
   const [myTeam, setMyTeam] = useState(null);
@@ -21,7 +21,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     getProject(id).then(async (p) => {
       setProject(p);
-      if (p) setMentor(await getUser(p.mentorId));
+      if (p) setMentor(await getUser(p.mentorId).catch(() => null));
     });
   }, [id]);
 
@@ -35,15 +35,20 @@ export default function ProjectDetailPage() {
     );
   }, [currentUser, isMentor, id]);
 
+  // Teams are only visible to signed-in users.
   useEffect(() => {
-    getTeamsForProject(id).then(setProjectTeams);
-  }, [id]);
+    if (!currentUser) return;
+    getTeamsForProject(id)
+      .then(setProjectTeams)
+      .catch(() => setProjectTeams([]));
+  }, [id, currentUser]);
 
   async function handleJoin() {
     setJoining(true);
     setError("");
     try {
-      const team = await joinProject(id, currentUser.id);
+      // With real accounts, the learner's name is shared with their new teammates only.
+      const team = await joinProject(id, currentUser.id, mode === "auth" ? currentUser.name : undefined);
       router.push(`/teams/${team.id}`);
     } catch (e) {
       setError(e.message || "Could not join the project");
@@ -149,7 +154,7 @@ export default function ProjectDetailPage() {
             <div className="eyebrow">Team size</div>
             {project.teamSize} learners
           </div>
-          <div>
+          <div hidden={signedOut}>
             <div className="eyebrow">Teams</div>
             {projectTeams.filter((t) => t.status === "active").length} active
             {openSpots > 0 ? ` · ${openSpots} open spot${openSpots > 1 ? "s" : ""}` : " · joining starts a new team"}
@@ -160,6 +165,10 @@ export default function ProjectDetailPage() {
                 ? "This is your project. Open a team to guide it and give final feedback."
                 : "You are viewing as a mentor. Only learners can join projects."}
             </p>
+          ) : signedOut ? (
+            <Link href={`/signup?next=${encodeURIComponent(`/projects/${id}`)}`} className="btn">
+              Sign up to join
+            </Link>
           ) : myTeam ? (
             <Link href={`/teams/${myTeam.id}`} className="btn">
               Go to my team

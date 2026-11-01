@@ -12,7 +12,7 @@
 //   teammates (teamNames) and everyone else's anonymous name.
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { logOut, watchAuth } from "@/lib/auth";
+import { logOut, refreshAuthUser, watchAuth } from "@/lib/auth";
 import {
   ensureAccount,
   getConnectionsForLearner,
@@ -22,6 +22,7 @@ import {
   getTeamsForUser,
   getUsers,
 } from "@/lib/db";
+import { isProfileComplete } from "@/lib/profile";
 import { getMode } from "@/lib/session";
 
 const UserContext = createContext(null);
@@ -32,7 +33,9 @@ export function UserProvider({ children }) {
   const [mode, setMode] = useState(null); // decided in the browser (it reads localStorage)
   const [users, setUsers] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [profile, setProfile] = useState(null); // real accounts: { name, email }
+  const [profile, setProfile] = useState(null); // real accounts: name, email, date of birth, education
+  // real accounts: { email, emailVerified, providers: ["password", "google.com"] }
+  const [authInfo, setAuthInfo] = useState(null);
   const [connections, setConnections] = useState([]);
   const [teamNames, setTeamNames] = useState({}); // real accounts: { uid: name } of my teammates
   // loaded: we know who is using the app (or that nobody is signed in).
@@ -72,6 +75,7 @@ export function UserProvider({ children }) {
     return watchAuth(async (authUser) => {
       setDataError("");
       if (!authUser) {
+        setAuthInfo(null);
         setUsers([]);
         setCurrentUserId(null);
         setProfile(null);
@@ -86,6 +90,7 @@ export function UserProvider({ children }) {
         const [all, mine] = await Promise.all([getUsers(), getProfile(authUser.uid)]);
         setUsers(all.some((u) => u.id === me.id) ? all : [...all, me]);
         setProfile(mine);
+        setAuthInfo(describeAuthUser(authUser));
         setCurrentUserId(authUser.uid);
         setSignedOut(false);
       } catch (error) {
@@ -99,6 +104,17 @@ export function UserProvider({ children }) {
     setUsers(await getUsers());
     if (mode === "auth" && currentUserId) setProfile(await getProfile(currentUserId));
   }, [mode, currentUserId]);
+
+  const refreshProfile = useCallback(async () => {
+    if (mode !== "auth" || !currentUserId) return;
+    setProfile(await getProfile(currentUserId));
+  }, [mode, currentUserId]);
+
+  // After linking Google, adding a password or verifying the email.
+  const refreshAuthInfo = useCallback(async () => {
+    if (mode !== "auth") return;
+    setAuthInfo(describeAuthUser(await refreshAuthUser()));
+  }, [mode]);
 
   const userRecord = users.find((u) => u.id === currentUserId) || null;
   // My own record, with my private name and email added (only I can read them).
@@ -195,6 +211,12 @@ export function UserProvider({ children }) {
         refreshConnections,
         loaded,
         signedOut: mode === "auth" && signedOut,
+        profile,
+        refreshProfile,
+        // Real accounts must fill in their basic details before using the app (see AuthGate).
+        profileComplete: mode !== "auth" || !currentUser || isProfileComplete(profile),
+        authInfo,
+        refreshAuthInfo,
         dataError,
         signOut,
       }}
@@ -202,6 +224,15 @@ export function UserProvider({ children }) {
       {children}
     </UserContext.Provider>
   );
+}
+
+function describeAuthUser(user) {
+  if (!user) return null;
+  return {
+    email: user.email || "",
+    emailVerified: Boolean(user.emailVerified),
+    providers: (user.providerData || []).map((p) => p.providerId),
+  };
 }
 
 export function useUser() {

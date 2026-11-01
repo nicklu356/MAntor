@@ -5,7 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useUser } from "./UserProvider";
-import { explainAuthError, logInWithEmail, logInWithGoogle, resetPassword, signUpWithEmail } from "@/lib/auth";
+import {
+  explainAuthError,
+  googleSignInProblem,
+  logInWithEmail,
+  logInWithGoogle,
+  resetPassword,
+  signUpWithEmail,
+} from "@/lib/auth";
 import { startDemo } from "@/lib/session";
 
 // Only go back to a page inside this site.
@@ -14,17 +21,18 @@ const safeNext = (value) => (value && value.startsWith("/") && !value.startsWith
 export default function AuthForm({ kind }) {
   const router = useRouter();
   const { mode, currentUser } = useUser();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [next, setNext] = useState("/");
+  const [googleProblem, setGoogleProblem] = useState("");
   const signingUp = kind === "signup";
 
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get("next")));
+    setGoogleProblem(googleSignInProblem());
   }, []);
 
   // Already signed in (or just signed in): go on.
@@ -59,7 +67,7 @@ export default function AuthForm({ kind }) {
 
   function submit(e) {
     e.preventDefault();
-    run(() => (signingUp ? signUpWithEmail({ name, email, password }) : logInWithEmail(email, password)));
+    run(() => (signingUp ? signUpWithEmail({ email, password }) : logInWithEmail(email, password)));
   }
 
   function forgot() {
@@ -76,12 +84,17 @@ export default function AuthForm({ kind }) {
         <h1>{signingUp ? "Create your account" : "Welcome back"}</h1>
         <p className="muted">
           {signingUp
-            ? "Join a team, build real projects, and get feedback against industry standards."
+            ? "Join a team, build real projects, and get feedback against industry standards. Next, you add a few basic details."
             : "Log in to continue your projects."}
         </p>
       </div>
 
-      <button type="button" className="btn btn-secondary google" onClick={() => run(logInWithGoogle)} disabled={busy}>
+      <button
+        type="button"
+        className="btn btn-secondary google"
+        onClick={() => run(logInWithGoogle)}
+        disabled={busy || Boolean(googleProblem)}
+      >
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
           <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7Z" />
           <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3a7.2 7.2 0 0 1-10.8-3.8h-4v3.1A12 12 0 0 0 12 24Z" />
@@ -90,19 +103,13 @@ export default function AuthForm({ kind }) {
         </svg>
         Continue with Google
       </button>
+      {googleProblem && <p className="error small">{googleProblem}</p>}
 
       <div className="divider">
         <span>or with email</span>
       </div>
 
       <form onSubmit={submit} className="stack">
-        {signingUp && (
-          <label className="field">
-            Your name
-            <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required maxLength={60} />
-            <span className="muted small">Only your teammates see it. Mentors see an anonymous name.</span>
-          </label>
-        )}
         <label className="field">
           Email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />

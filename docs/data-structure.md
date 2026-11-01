@@ -267,9 +267,10 @@ users (learners and mentors)
 
 | Collection | Document id | Fields | Who can read it |
 |------------|-------------|--------|-----------------|
-| `profiles` | user id | `name`, `email`, `createdAt` | Only that user |
+| `profiles` | user id | `firstName`, `lastName`, `name` (both together), `email`, `dateOfBirth` (`YYYY-MM-DD`), `educationLevel`, `school`, `fieldOfStudy`, `graduationYear` (number or null), `createdAt`, `updatedAt` | Only that user |
 | `teamNames` | team id | one field per member: `{ "<uid>": "Alice Wong" }` | Only that team's members |
 
+* New accounts fill in their profile (name, date of birth, education) before using the app. The checks are in `lib/profile.js` (for example, users must be at least 13)
 * Accepting a mentor's connection request copies the learner's name into the connection (`learnerName`), so only that mentor can see it
 * The rules for every collection are in `firestore.rules`
 

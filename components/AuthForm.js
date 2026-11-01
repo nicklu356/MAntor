@@ -9,6 +9,7 @@ import {
   explainAuthError,
   googleSignInProblem,
   logInWithEmail,
+  prepareGoogleSignIn,
   logInWithGoogle,
   resetPassword,
   signUpWithEmail,
@@ -32,8 +33,10 @@ export default function AuthForm({ kind }) {
 
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get("next")));
-    setGoogleProblem(googleSignInProblem());
-  }, []);
+    const problem = googleSignInProblem();
+    setGoogleProblem(problem);
+    if (!problem && mode === "auth") prepareGoogleSignIn();
+  }, [mode]);
 
   // Already signed in (or just signed in): go on.
   useEffect(() => {

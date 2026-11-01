@@ -4,13 +4,14 @@
 // Below the board: progress chart, AI personal analysis (learners) and the mentor's final feedback.
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import FinalFeedback from "@/components/FinalFeedback";
 import PersonalAnalysis from "@/components/PersonalAnalysis";
 import ProgressPanel from "@/components/ProgressPanel";
 import TeamMembers from "@/components/TeamMembers";
 import { useUser } from "@/components/UserProvider";
-import { getProject, getTasks, getTeam, leaveTeam, updateTask } from "@/lib/db";
+import { getProject, leaveTeam, updateTask } from "@/lib/db";
+import { useLiveDoc, useLiveList } from "@/lib/live";
 
 const COLUMNS = [
   { status: "todo", label: "To do" },
@@ -23,32 +24,26 @@ export default function TeamPage() {
   const { id } = useParams();
   const router = useRouter();
   const { currentUser, isMentor, userName } = useUser();
-  const [team, setTeam] = useState(undefined);
+  // Live: the board and the team update by themselves when a teammate moves a card, takes a task,
+  // submits work, joins or leaves.
+  const team = useLiveDoc("teams", id);
+  const tasks = useLiveList("tasks", "teamId", id) || [];
   const [project, setProject] = useState(null);
-  const [tasks, setTasks] = useState([]);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState("");
   const [dragging, setDragging] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
 
-  const loadTasks = useCallback(() => getTasks(id).then(setTasks), [id]);
-
+  const projectId = team?.projectId;
   useEffect(() => {
-    getTeam(id).then(async (t) => {
-      setTeam(t);
-      if (t) {
-        setProject(await getProject(t.projectId));
-        loadTasks();
-      }
-    });
-  }, [id, loadTasks]);
+    if (projectId) getProject(projectId).then(setProject);
+  }, [projectId]);
 
   async function move(task, step) {
     const next = ORDER[ORDER.indexOf(task.status) + step];
     if (!next) return;
     await updateTask(task.id, { status: next });
-    loadTasks();
   }
 
   // Drag a card to another column (the arrow buttons do the same for keyboard users).
@@ -57,9 +52,7 @@ export default function TeamPage() {
     setDragging(null);
     setDropTarget(null);
     if (!task || task.status === status) return;
-    setTasks((list) => list.map((t) => (t.id === task.id ? { ...t, status } : t)));
     await updateTask(task.id, { status });
-    loadTasks();
   }
 
   async function toggleAssign(task) {
@@ -68,7 +61,6 @@ export default function TeamPage() {
       ? task.assigneeIds.filter((u) => u !== currentUser.id)
       : [...task.assigneeIds, currentUser.id];
     await updateTask(task.id, { assigneeIds });
-    loadTasks();
   }
 
   async function handleLeave() {
@@ -253,7 +245,6 @@ export default function TeamPage() {
         project={project}
         tasks={tasks}
         canGive={isProjectMentor}
-        onSaved={() => getTeam(id).then(setTeam)}
       />
     </div>
   );

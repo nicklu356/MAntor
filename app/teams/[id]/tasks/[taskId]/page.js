@@ -3,7 +3,7 @@
 // One task: instructions, submission, contribution form, and AI feedback.
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CoachPanel from "@/components/CoachPanel";
 import CommentThread from "@/components/CommentThread";
 import ContributionForm from "@/components/ContributionForm";
@@ -12,7 +12,8 @@ import HelpRequest from "@/components/HelpRequest";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
-import { getContributions, getProject, getTask, getTeam, submitTask, toggleKudos } from "@/lib/db";
+import { getProject, getTeam, submitTask, toggleKudos } from "@/lib/db";
+import { useLiveDoc, useLiveList } from "@/lib/live";
 
 const STATUS_LABEL = { todo: "To do", in_progress: "In progress", done: "Done" };
 
@@ -40,32 +41,35 @@ export default function TaskPage() {
   const toast = useToast();
   const [team, setTeam] = useState(null);
   const [project, setProject] = useState(null);
-  const [task, setTask] = useState(undefined);
-  const [contributions, setContributions] = useState([]);
+  // Live: the task (submission, status, help request) and its contributions update by themselves
+  // when a teammate or the mentor changes them.
+  const task = useLiveDoc("tasks", taskId);
+  const contributions = useLiveList("contributions", "taskId", taskId) || [];
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const loadTask = useCallback(
-    () =>
-      getTask(taskId).then((t) => {
-        setTask(t);
-        setDraft(t?.submission?.content || "");
-      }),
-    [taskId]
-  );
-  const loadContributions = useCallback(
-    () => getContributions(taskId).then(setContributions),
-    [taskId]
-  );
+  const [teammateSaved, setTeammateSaved] = useState(false);
+  const savedVersion = useRef(null); // the saved submission the draft was based on
 
   useEffect(() => {
     getTeam(teamId).then(async (t) => {
       setTeam(t);
       if (t) setProject(await getProject(t.projectId));
     });
-    loadTask();
-    loadContributions();
-  }, [teamId, loadTask, loadContributions]);
+  }, [teamId]);
+
+  // When the saved submission changes, follow it, unless you are in the middle of editing:
+  // then keep your text and say a teammate saved a newer version.
+  const saved = task?.submission?.content || "";
+  useEffect(() => {
+    if (task === undefined) return;
+    setDraft((current) => {
+      const untouched = savedVersion.current === null || current === savedVersion.current;
+      if (!untouched && current !== saved) setTeammateSaved(true);
+      return untouched ? saved : current;
+    });
+    savedVersion.current = saved;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved, task === undefined]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -74,7 +78,7 @@ export default function TaskPage() {
     try {
       const updating = Boolean(task.submission);
       await submitTask(taskId, currentUser.id, draft.trim());
-      await loadTask();
+      setTeammateSaved(false);
       toast(updating ? "Submission updated. Ask for new feedback to see your progress." : "Work submitted");
     } catch (err) {
       toast(err.message || "Could not save your submission", "error");
@@ -147,6 +151,21 @@ export default function TaskPage() {
                     {draft.length} / {MAX_SUBMISSION_CHARS}
                   </span>
                   {unsaved && <span className="badge badge-amber">Unsaved changes</span>}
+                  {teammateSaved && (
+                    <span className="row small">
+                      <span className="badge badge-amber">A teammate saved a newer version</span>
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => {
+                          setDraft(saved);
+                          setTeammateSaved(false);
+                        }}
+                      >
+                        Load it
+                      </button>
+                    </span>
+                  )}
                 </div>
               )}
             </form>
@@ -169,7 +188,6 @@ export default function TaskPage() {
             task={task}
             isMember={isMember}
             isProjectMentor={isProjectMentor}
-            onChange={() => getTask(taskId).then(setTask)}
           />
 
           <CommentThread taskId={taskId} teamId={teamId} canPost={isMember || isProjectMentor} />
@@ -198,10 +216,7 @@ export default function TaskPage() {
                     contribution={c}
                     canGive={isMember && c.userId !== currentUser?.id}
                     mine={(c.kudos || []).some((k) => k.userId === currentUser?.id)}
-                    onToggle={async () => {
-                      await toggleKudos(c.id, currentUser.id);
-                      loadContributions();
-                    }}
+                    onToggle={() => toggleKudos(c.id, currentUser.id)}
                   />
                 </li>
               ))}
@@ -212,7 +227,6 @@ export default function TaskPage() {
               taskId={taskId}
               teamId={teamId}
               userId={currentUser.id}
-              onAdded={loadContributions}
             />
           )}
         </aside>

@@ -41,6 +41,7 @@ Students and career changers need hands-on experience, but online learning rarel
 | Verified AI feedback (scored and saved by the server) and a public portfolio link for CVs | ✅ Built (needs `FIREBASE_SERVICE_ACCOUNT`) |
 | Ad blocker detection with a clear message when it stops Google sign-in | ✅ Built |
 | Privacy policy and terms, "Download my data", "Delete my account" | ✅ Built (deletion needs `FIREBASE_SERVICE_ACCOUNT`) |
+| Live updates: board, discussion, submissions, feedback and team appear for everyone without reloading (also between tabs in the demo) | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 
 ### 🔌 What happens without an API key
@@ -270,6 +271,7 @@ lib/
   server/firebaseAdmin.js          Server access to Firebase (verified feedback, public portfolios)
   server/portfolio.js              Builds the public portfolio
   session.js                       Demo or real accounts
+  live.js                          useLiveList / useLiveDoc hooks (live updates)
   firebase.js, mockStore.js, config.js
 tests/                             Unit tests for lib/ (npm test)
 e2e/                               Browser tests: demo.spec.mjs (demo), accounts.spec.mjs (accounts, emulators)

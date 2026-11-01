@@ -2,22 +2,18 @@
 
 // Short team discussion under a task. Learners of the team and the project's mentor can post.
 // Names go through userName(), so a mentor only sees anonymous learner names.
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { MAX_COMMENT_CHARS } from "@/lib/config";
-import { addComment, getComments } from "@/lib/db";
+import { addComment } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
 
 export default function CommentThread({ taskId, teamId, canPost }) {
   const { currentUser, users, userName } = useUser();
-  const [comments, setComments] = useState([]);
+  // Live: new messages from teammates appear without reloading.
+  const comments = useLiveList("comments", "taskId", taskId) || [];
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const load = useCallback(() => getComments(taskId).then(setComments), [taskId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -26,7 +22,6 @@ export default function CommentThread({ taskId, teamId, canPost }) {
     await addComment({ taskId, teamId, userId: currentUser.id, text: text.trim() });
     setText("");
     setSaving(false);
-    load();
   }
 
   const roleOf = (id) => users.find((u) => u.id === id)?.role;

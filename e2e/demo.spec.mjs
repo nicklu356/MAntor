@@ -47,6 +47,14 @@ test("task board: drag a card to another column", async ({ page }) => {
   await expect(page.locator(".column").nth(1)).toContainText("Design the new flow");
 });
 
+test("live updates between two tabs of the demo", async ({ page, context }) => {
+  await page.goto("/teams/team_001");
+  const other = await context.newPage();
+  await other.goto("/teams/team_001");
+  await page.locator(".task-card", { hasText: "Test and iterate" }).dragTo(page.locator(".column").nth(1));
+  await expect(other.locator(".column").nth(1)).toContainText("Test and iterate"); // the other tab, no reload
+});
+
 test("anonymity: mentor sees anonymous names until the learner accepts", async ({ page }) => {
   await switchUser(page, "Grace Walker (mentor)");
   await page.goto("/teams/team_001");

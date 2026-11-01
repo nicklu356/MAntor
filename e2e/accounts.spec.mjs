@@ -231,6 +231,31 @@ test("profile photo: shrunk to 256 x 256, seen by teammates and the accepted men
   await expect(maya.locator("main li", { hasText: "Learner #" }).locator(".avatar img")).toHaveCount(0);
 });
 
+test("live updates: teammates see messages, board moves and submissions without reloading", async () => {
+  await alice.goto(taskUrl);
+  await bob.goto(taskUrl);
+  await expect(bob.locator("main")).toContainText("Hi team");
+  await alice.fill('textarea[aria-label="Message"]', "Live hello from Alice");
+  await alice.click("button:has-text('Send')");
+  await expect(bob.locator("main")).toContainText("Live hello from Alice"); // no reload
+
+  // Bob is editing; Alice saves a new version. Bob keeps his text and is told.
+  await bob.fill('textarea[aria-label="Submission"]', "Bob's unsaved edit");
+  await alice.fill('textarea[aria-label="Submission"]', "Alice's newer version");
+  await alice.click("text=Update submission");
+  await expect(bob.locator("main")).toContainText("A teammate saved a newer version");
+  await expect(bob.locator('textarea[aria-label="Submission"]')).toHaveValue("Bob's unsaved edit");
+  await bob.click("text=Load it");
+  await expect(bob.locator('textarea[aria-label="Submission"]')).toHaveValue("Alice's newer version");
+
+  await alice.goto(teamUrl);
+  await bob.goto(teamUrl);
+  const card = alice.locator(".column").nth(0).locator(".task-card").first();
+  const title = (await card.locator("a").innerText()).trim();
+  await card.dragTo(alice.locator(".column").nth(2));
+  await expect(bob.locator(".column").nth(2)).toContainText(title); // no reload
+});
+
 test("account: edit details; the new name reaches teammates", async () => {
   await bob.goto("/account");
   await expect(bob.locator("main")).toContainText("You can log in with your email and password.");

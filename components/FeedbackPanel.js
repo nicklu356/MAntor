@@ -2,10 +2,11 @@
 
 // Shows AI feedback for a task and lets the team request new feedback.
 // When there is more than one review, each score shows the change since the previous review.
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { currentAuthUser } from "@/lib/auth";
-import { addFeedback, getFeedback } from "@/lib/db";
+import { addFeedback } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
 
 export function ScoreDots({ score }) {
   return (
@@ -44,18 +45,11 @@ export function ReviewBadges({ review }) {
 
 export default function FeedbackPanel({ project, task, teamId, contributions, canRequest, userId }) {
   const { mode } = useUser();
-  const [items, setItems] = useState([]);
+  // Live: a review a teammate asks for appears here too. Newest first.
+  const live = useLiveList("feedback", "taskId", task.id);
+  const items = useMemo(() => [...(live || [])].reverse(), [live]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const load = useCallback(
-    () => getFeedback(task.id).then((list) => setItems([...list].reverse())),
-    [task.id]
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function requestFeedback() {
     setLoading(true);
@@ -80,7 +74,6 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
         simulated: data.simulated,
         requestedBy: userId || null,
       });
-      await load();
     } catch (e) {
       setError(e.message);
     }

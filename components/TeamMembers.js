@@ -4,23 +4,21 @@
 // The project's mentor can ask to learn a learner's identity ("I'm interested in your work").
 // Nothing is revealed until the learner accepts (see the requests card on the learner's home).
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Avatar from "@/components/Avatar";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
-import { getContributionsForTeam, requestConnection } from "@/lib/db";
+import { requestConnection } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
 
 export default function TeamMembers({ team, project, canConnect }) {
   const toast = useToast();
   const { currentUser, userName, connections, refreshConnections } = useUser();
-  const [contributions, setContributions] = useState([]);
+  const contributions = useLiveList("contributions", "teamId", team.id) || [];
   const [asking, setAsking] = useState(null);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    getContributionsForTeam(team.id).then(setContributions);
-  }, [team.id]);
 
   const hoursOf = (id) =>
     contributions.filter((c) => c.userId === id).reduce((sum, c) => sum + (Number(c.hoursSpent) || 0), 0);

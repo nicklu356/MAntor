@@ -2,33 +2,25 @@
 
 // The mentor's final feedback for a team.
 // Mentors of this project see a form; everyone else sees the feedback once it exists.
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { ScoreDots } from "@/components/FeedbackPanel";
 import { MAX_FEEDBACK_CHARS } from "@/lib/config";
-import { addFinalFeedback, getTeamFeedback } from "@/lib/db";
+import { addFinalFeedback } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
 
 export default function FinalFeedback({ team, project, tasks, canGive, onSaved }) {
   const { users, currentUser } = useUser();
-  const [latest, setLatest] = useState(undefined);
   const [scores, setScores] = useState({});
   const [comments, setComments] = useState({});
   const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(
-    () =>
-      getTeamFeedback(team.id).then((list) => {
-        const finals = list.filter((f) => f.kind === "final");
-        setLatest(finals.length ? finals[finals.length - 1] : null);
-      }),
-    [team.id]
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Live: the learners see the mentor's final feedback as soon as it is saved.
+  const feedback = useLiveList("feedback", "teamId", team.id);
+  const finals = (feedback || []).filter((f) => f.kind === "final");
+  const latest = feedback === undefined ? undefined : finals[finals.length - 1] || null;
 
   if (latest === undefined || !project) return null;
 
@@ -56,7 +48,6 @@ export default function FinalFeedback({ team, project, tasks, canGive, onSaved }
       setSummary("");
       setScores({});
       setComments({});
-      await load();
       onSaved?.();
     } catch (err) {
       setError(err.message || "Could not save feedback");

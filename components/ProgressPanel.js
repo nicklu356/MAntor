@@ -2,18 +2,14 @@
 
 // Progress visualisation: tasks done, and for every criterion the score history
 // (for example 2 -> 3 -> 4) so learners can see that revising their work pays off.
-import { useEffect, useState } from "react";
-import { getTeamFeedback } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
 import { buildCriteriaResults } from "@/lib/progress";
 
 export default function ProgressPanel({ project, tasks, teamId }) {
-  const [feedback, setFeedback] = useState(null);
+  // Live: new reviews update the scores straight away.
+  const feedback = useLiveList("feedback", "teamId", teamId);
 
-  useEffect(() => {
-    getTeamFeedback(teamId).then(setFeedback);
-  }, [teamId]);
-
-  if (!project || feedback === null) return null;
+  if (!project || !feedback) return null;
 
   const rows = buildCriteriaResults(project, tasks, feedback);
   const reviewed = rows.filter((r) => r.latestScore != null);

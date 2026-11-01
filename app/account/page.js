@@ -1,7 +1,7 @@
 "use client";
 
 // Your account: basic details, how you log in, and the application to become a mentor.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ProfileForm from "@/components/ProfileForm";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
@@ -11,6 +11,7 @@ import {
   disconnectGoogle,
   explainAuthError,
   googleSignInProblem,
+  prepareGoogleSignIn,
   resendVerification,
 } from "@/lib/auth";
 import { requestMentorRole } from "@/lib/db";
@@ -89,6 +90,11 @@ function SignInMethods() {
   const hasPassword = providers.includes("password");
   const hasGoogle = providers.includes("google.com");
   const googleProblem = typeof window === "undefined" ? "" : googleSignInProblem();
+
+  // Get the Google window ready, so "Connect Google" is not blocked as a pop-up.
+  useEffect(() => {
+    if (!hasGoogle && !googleProblem) prepareGoogleSignIn();
+  }, [hasGoogle, googleProblem]);
 
   async function act(key, action, success) {
     setBusy(key);

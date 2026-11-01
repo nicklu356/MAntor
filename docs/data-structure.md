@@ -270,7 +270,8 @@ users (learners and mentors)
 
 | Collection | Document id | Fields | Who can read it |
 |------------|-------------|--------|-----------------|
-| `profiles` | user id | `firstName`, `lastName`, `name` (both together), `email`, `dateOfBirth` (`YYYY-MM-DD`), `educationLevel`, `school`, `fieldOfStudy`, `graduationYear` (number or null), `photo` (256 × 256 JPEG data URL or null), `createdAt`, `updatedAt` | Only that user |
+| `profiles` | user id | `firstName`, `lastName`, `name` (both together), `email`, `dateOfBirth` (`YYYY-MM-DD`), `educationLevel`, `school`, `fieldOfStudy`, `graduationYear` (number or null), `photo` (256 × 256 JPEG data URL or null), `emailNotifications` (false = no emails), `language` (`en` or `zh-TW`, the language of their emails), `createdAt`, `updatedAt` | Only that user |
+| `mailLog` | `<event>_<record id>` | `event`, `at`: one entry per email-worthy event, so it is emailed only once (no personal data) | Nobody (server only) |
 | `teamNames` | team id | one field per member: `{ "<uid>": "Alice Wong" }` | Only that team's members |
 | `teamPhotos` | team id | one field per member: `{ "<uid>": "data:image/jpeg;base64,..." }` (max 150,000 characters) | Only that team's members |
 
@@ -298,4 +299,5 @@ users (learners and mentors)
 | AI coach | `tasks`, `projects.criteria` | nothing (chat kept in the learner's browser) |
 | Identity reveal | `connections` | `connections` |
 | Notifications | `tasks`, `comments`, `feedback`, `connections` | nothing ("read" time kept in the browser) |
+| Email notifications (server) | the record the action created, `teams`, `projects`, `profiles`, Authentication (verified email) | `mailLog` |
 | Portfolio | `teams`, `projects`, `tasks`, `feedback`, `contributions` | nothing |

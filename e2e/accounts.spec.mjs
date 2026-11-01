@@ -1,7 +1,9 @@
 // End-to-end tests with real accounts, against the Firebase emulators (npm run test:e2e:firebase).
 // One story, in order: an admin, a mentor and two learners each use their own browser.
+import { readFileSync, rmSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
+import { EMULATOR_ENV } from "../playwright.firebase.config.mjs";
 
 test.describe.configure({ mode: "serial" });
 
@@ -19,6 +21,31 @@ async function uidOf(address) {
     body: "{}",
   });
   return (await res.json()).userInfo.find((u) => u.email === address).localId;
+}
+
+// Like clicking the link in the verification email (only verified addresses get notifications).
+async function markVerified(address) {
+  const res = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:update`, {
+    method: "POST",
+    headers: { ...owner, "Content-Type": "application/json" },
+    body: JSON.stringify({ localId: await uidOf(address), emailVerified: true }),
+  });
+  expect(res.ok).toBeTruthy();
+}
+
+// Emails the server "sent" (written to a file by the test setup instead).
+function sentEmails() {
+  try {
+    return readFileSync(EMULATOR_ENV.MAIL_OUTBOX, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
+const emailsTo = (address) => sentEmails().filter((m) => m.to === address);
+
+async function profileOf(uid) {
+  const res = await fetch(`${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/profiles/${uid}`, { headers: owner });
+  return (await res.json()).fields || {};
 }
 
 async function setField(collection, id, field, value) {
@@ -91,6 +118,7 @@ let projectUrl, teamUrl, taskUrl;
 
 test.beforeAll(async ({ browser: b }) => {
   browser = b;
+  rmSync(EMULATOR_ENV.MAIL_OUTBOX, { force: true });
   const open = async () => (await browser.newContext()).newPage();
   [visitor, admin, maya, alice, bob] = await Promise.all([open(), open(), open(), open(), open()]);
 });
@@ -114,6 +142,7 @@ test("admin: promoted in the console, loads the sample projects", async () => {
   await signUp(admin, "Nick Admin", email("admin"));
   await expect(admin.locator(".account-chip")).toContainText("Nick Admin");
   await setField("users", await uidOf(email("admin")), "admin", { booleanValue: true });
+  await markVerified(email("admin"));
   await admin.goto("/admin");
   await admin.click("text=Load sample projects");
   await expect(admin.locator(".toast")).toContainText("Sample projects loaded");
@@ -124,6 +153,7 @@ test("admin: promoted in the console, loads the sample projects", async () => {
 
 test("mentor: applies, is approved, publishes a project", async () => {
   await signUp(maya, "Maya Private", email("maya"));
+  await markVerified(email("maya"));
   await maya.goto("/account");
   await maya.fill('label:has-text("Public name") input', "Maya Lin");
   await maya.fill('label:has-text("Company") input', "Acme Design");
@@ -132,6 +162,8 @@ test("mentor: applies, is approved, publishes a project", async () => {
   await admin.goto("/admin");
   await admin.locator("main li", { hasText: "Acme Design" }).locator('button:has-text("Approve")').click();
   await expect(admin.locator(".toast")).toContainText("is now a mentor");
+  await expect.poll(() => emailsTo(email("admin")).map((m) => m.subject)).toContain("New mentor application: Maya Lin");
+  await expect.poll(() => emailsTo(email("maya")).map((m) => m.subject)).toContain("You are now a mentor on MAntor");
 
   await maya.goto("/projects/new");
   await maya.fill('input[placeholder^="e.g. Reduce checkout"]', "Accounts test project");
@@ -145,11 +177,13 @@ test("mentor: applies, is approved, publishes a project", async () => {
 
 test("learners join the same team and see each other's names; the mentor does not", async () => {
   await signUp(alice, "Alice Wong", email("alice"));
+  await markVerified(email("alice"));
   await alice.goto(projectUrl);
   await alice.click("text=Join this project");
   await alice.waitForURL(/\/teams\//);
   teamUrl = alice.url();
   await signUp(bob, "Bob Smith", email("bob"));
+  await markVerified(email("bob"));
   await bob.goto(projectUrl);
   await bob.click("text=Join this project");
   await bob.waitForURL(/\/teams\//);
@@ -169,6 +203,10 @@ test("connection request: the learner shares their name with that mentor only", 
   await maya.locator("main li", { hasText: anonymous }).locator("text=Interested in their work").click();
   await maya.click("text=Send request");
   await expect(maya.locator("main")).toContainText("Request pending");
+  await expect.poll(() => emailsTo(email("alice")).map((m) => m.subject)).toContain("A mentor is interested in your work");
+  const [request] = emailsTo(email("alice"));
+  expect(request.text).toContain("Maya Lin from Acme Design");
+  expect(request.text).toContain("http://localhost:3200/");
   await alice.goto("/");
   await alice.click("text=Share my name");
   await expect(alice.locator("main")).toContainText("Connected with Maya Lin");
@@ -178,6 +216,12 @@ test("connection request: the learner shares their name with that mentor only", 
 });
 
 test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos, final feedback", async () => {
+  // Bob reads the site in Chinese, so his emails come in Chinese.
+  const bobUid = await uidOf(email("bob"));
+  await bob.goto("/");
+  await bob.click(".lang-switch");
+  await expect.poll(async () => (await profileOf(bobUid)).language?.stringValue).toBe("zh-TW");
+
   await alice.goto(teamUrl);
   await alice.locator(".task-card a").first().click();
   await alice.fill('textarea[aria-label="Submission"]', "Our first draft with research notes.");
@@ -198,6 +242,23 @@ test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos
   await expect(alice.locator("main")).toContainText("Waiting for the mentor");
   taskUrl = alice.url();
 
+  // Emails: Bob hears about Alice's comment (in Chinese); the mentor about the help request, by anonymous name.
+  await expect.poll(() => emailsTo(email("bob")).map((m) => m.subject).join()).toContain("Alice Wong 在「");
+  expect(emailsTo(email("bob"))[0].text).toContain("Hi team");
+  await expect.poll(() => emailsTo(email("maya")).map((m) => m.subject).join()).toContain("A team needs your help on");
+  const help = emailsTo(email("maya")).find((m) => m.subject.startsWith("A team needs your help"));
+  expect(help.text).toContain("Is this the right scope?");
+  expect(help.text).toContain("Learner #");
+  expect(help.text).not.toContain("Alice");
+  expect(emailsTo(email("alice")).some((m) => m.subject.includes("commented"))).toBeFalsy(); // not about your own comment
+
+  await bob.click(".lang-switch"); // back to English
+  await expect(bob.locator(".lang-switch")).toHaveText("中文");
+  // Alice switches emails off.
+  await alice.goto("/account");
+  await alice.locator('label:has-text("Email me when something needs me") input').click();
+  await expect(alice.locator(".toast")).toContainText("Email notifications are off");
+
   await bob.goto(taskUrl);
   await bob.locator("main li", { hasText: "Wrote the draft" }).locator("button.kudos").click();
   await expect(bob.locator("main")).toContainText("Thanked");
@@ -210,6 +271,8 @@ test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos
   await maya.fill('textarea[placeholder^="What went well"]', "Good start.");
   await maya.click("text=Save final feedback");
   await expect(maya.locator("main")).toContainText("Update final feedback");
+  await expect.poll(() => emailsTo(email("bob")).map((m) => m.subject)).toContain("Final feedback on “Accounts test project”");
+  expect(emailsTo(email("alice")).some((m) => m.subject.startsWith("Final feedback"))).toBeFalsy(); // switched off
 });
 
 test("profile photo: shrunk to 256 x 256, seen by teammates and the accepted mentor only", async () => {

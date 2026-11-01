@@ -25,3 +25,4 @@ Thumbs.db
 firebase-debug.log
 firestore-debug.log
 /playwright-report-firebase/
+mail.jsonl

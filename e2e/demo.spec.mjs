@@ -169,6 +169,7 @@ test("portfolio shows a completed project and achievements", async ({ page }) =>
 
 test("privacy and terms page is linked from the footer", async ({ page }) => {
   await page.click("footer >> text=Privacy and terms");
+  await page.waitForURL("**/privacy");
   await expect(page.locator("main h1")).toContainText("Privacy and terms");
 });
 

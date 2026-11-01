@@ -18,9 +18,10 @@ import {
 } from "@/lib/auth";
 import Link from "next/link";
 import { currentAuthUser } from "@/lib/auth";
-import { requestMentorRole } from "@/lib/db";
+import { requestMentorRole, saveSettings } from "@/lib/db";
 import { collectMyData, downloadJson } from "@/lib/exportData";
-import { useT } from "@/components/LocaleProvider";
+import { useLocale, useT } from "@/components/LocaleProvider";
+import { LOCALE_NAMES } from "@/lib/i18n";
 
 function MentorApplication({ user, onSaved }) {
   const t = useT();
@@ -335,6 +336,64 @@ function YourData() {
   );
 }
 
+function EmailSettings() {
+  const { t, locale } = useLocale();
+  const toast = useToast();
+  const { currentUser, profile, refreshProfile, authInfo } = useUser();
+  const [mailReady, setMailReady] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const on = profile?.emailNotifications !== false;
+
+  useEffect(() => {
+    fetch("/api/status")
+      .then((res) => res.json())
+      .then((data) => setMailReady(Boolean(data.mail && data.admin)))
+      .catch(() => setMailReady(false));
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      await saveSettings(currentUser.id, { emailNotifications: !on });
+      await refreshProfile();
+      toast(on ? t("Email notifications are off") : t("Email notifications are on"));
+    } catch (e) {
+      toast(e.message || t("Something went wrong"), "error");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section className="card stack">
+      <h2>{t("Email notifications")}</h2>
+      <label className="row" style={{ alignItems: "flex-start", gap: 10 }}>
+        <input type="checkbox" checked={on} disabled={busy} onChange={toggle} style={{ marginTop: 4 }} />
+        <span>
+          {t("Email me when something needs me")}
+          <span className="muted small" style={{ display: "block" }}>
+            {currentUser.role === "mentor"
+              ? t("A team asks for your help, or someone in a team comments.")
+              : t("A teammate comments, your mentor gives final feedback, or a mentor would like to know who you are.")}
+            {currentUser.admin ? ` ${t("As an admin, also new mentor applications.")}` : ""}
+          </span>
+        </span>
+      </label>
+      <p className="muted small">
+        {t("Emails go to {email}, written in {language} (the language you use on this site).", {
+          email: authInfo?.email || profile?.email || "?",
+          language: LOCALE_NAMES[locale],
+        })}
+      </p>
+      {authInfo && !authInfo.emailVerified && (
+        <p className="status small">{t("Verify your email address first: emails only go to verified addresses.")}</p>
+      )}
+      {mailReady === false && (
+        <p className="muted small">{t("Email is not set up on this site yet, so nothing is sent for now.")}</p>
+      )}
+    </section>
+  );
+}
+
 export default function AccountPage() {
   const t = useT();
   const toast = useToast();
@@ -368,6 +427,8 @@ export default function AccountPage() {
       </section>
 
       <SignInMethods />
+
+      <EmailSettings />
 
       <section className="card stack">
         <h2>{t("Mentoring")}</h2>

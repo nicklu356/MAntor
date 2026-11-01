@@ -298,7 +298,7 @@ test("every text the code passes to t() has a Traditional Chinese translation", 
   ["app", "components", "lib"].forEach((dir) => walk(join(root, dir)));
   const literal = String.raw`("(?:[^"\\\n]|\\.)*")`;
   const direct = new RegExp(String.raw`\bt\(\s*` + literal, "g"); // t("text")
-  const choice = new RegExp(String.raw`\bt\([^"\n()]*(?:\([^()]*\))?[^"\n()]*\?\s*` + literal + String.raw`\s*:\s*` + literal, "g"); // t(n > 1 ? "a" : "b")
+  const choice = new RegExp(String.raw`\bt\(\s*[^"()]*(?:\([^()]*\))?[^"()]*\?\s*` + literal + String.raw`\s*:\s*` + literal, "g"); // t(n > 1 ? "a" : "b")
   const missing = new Set();
   for (const file of files) {
     const source = readFileSync(file, "utf8");

@@ -1,6 +1,8 @@
 // End-to-end tests with real accounts, against the local Firebase emulators:
 //   npm run test:e2e:firebase   (starts the emulators, then runs these tests)
 // No real Firebase project or service account is used.
+import os from "node:os";
+import path from "node:path";
 import { defineConfig } from "@playwright/test";
 import { chromium } from "./playwright.config.mjs";
 
@@ -18,6 +20,10 @@ export const EMULATOR_ENV = {
   FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
   FIREBASE_SERVICE_ACCOUNT: "",
   ANTHROPIC_API_KEY: "",
+  // Emails are written to this file instead of being sent (see lib/server/mail.js).
+  MAIL_OUTBOX: path.join(os.tmpdir(), "mantor-e2e-mail.jsonl"),
+  SMTP_HOST: "",
+  SITE_URL: "http://localhost:3200",
 };
 
 export default defineConfig({

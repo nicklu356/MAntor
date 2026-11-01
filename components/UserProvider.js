@@ -18,20 +18,21 @@ import {
   getConnectionsForLearner,
   getConnectionsForMentor,
   getProfile,
+  saveSettings,
   getTeamNames,
   getTeamPhotos,
   getTeamsForUser,
   getUsers,
 } from "@/lib/db";
 import { isProfileComplete } from "@/lib/profile";
-import { useT } from "@/components/LocaleProvider";
+import { useLocale } from "@/components/LocaleProvider";
 import { getMode } from "@/lib/session";
 
 const UserContext = createContext(null);
 const STORAGE_KEY = "pdl-current-user";
 
 export function UserProvider({ children }) {
-  const t = useT();
+  const { t, locale } = useLocale();
   const pathname = usePathname();
   const [mode, setMode] = useState(null); // decided in the browser (it reads localStorage)
   const [users, setUsers] = useState([]);
@@ -108,6 +109,13 @@ export function UserProvider({ children }) {
     setUsers(await getUsers());
     if (mode === "auth" && currentUserId) setProfile(await getProfile(currentUserId));
   }, [mode, currentUserId]);
+
+  // Emails are written in the language you last used on the site.
+  useEffect(() => {
+    if (mode !== "auth" || !currentUserId || !profile || profile.language === locale) return;
+    setProfile((current) => (current ? { ...current, language: locale } : current));
+    saveSettings(currentUserId, { language: locale }).catch(() => {});
+  }, [mode, currentUserId, profile, locale]);
 
   const refreshProfile = useCallback(async () => {
     if (mode !== "auth" || !currentUserId) return;

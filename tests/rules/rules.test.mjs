@@ -177,6 +177,12 @@ test("analyses and connections stay with the people they belong to", async () =>
   await allows(() => F.updateDoc(doc("alice", "connections", `conn-${run}`), { status: "accepted", learnerName: "Alice Wong" }));
 });
 
+test("the email log is for the server only", async () => {
+  await denies(() => F.setDoc(doc("alice", "mailLog", `comment_x-${run}`), { event: "comment", at: "now" }));
+  await denies(() => F.getDocs(F.collection(people.alice.db, "mailLog")));
+  await allows(() => F.setDoc(doc("alice", "profiles", people.alice.uid), { emailNotifications: false, language: "zh-TW" }, { merge: true }));
+});
+
 // ---------- Signed-out visitors ----------
 
 test("signed-out visitors see the project catalogue and mentors only", async () => {

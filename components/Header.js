@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import Avatar from "./Avatar";
+import AccountMenu from "./AccountMenu";
 import NotificationBell from "./NotificationBell";
 import { APP_NAME } from "@/lib/config";
 import { exitDemo } from "@/lib/session";
@@ -112,12 +112,7 @@ export default function Header() {
           </button>
 
           {/* Real accounts */}
-          {mode === "auth" && currentUser && (
-            <Link href="/account" className="account-chip" title={t("Your account")}>
-              <Avatar id={currentUser.id} size={32} />
-              <span className="account-name">{currentUser.name}</span>
-            </Link>
-          )}
+          {mode === "auth" && currentUser && <AccountMenu />}
           {signedOut && (
             <>
               <Link href="/login" className="btn btn-ghost btn-small">

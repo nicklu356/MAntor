@@ -435,8 +435,11 @@ test("server settings: names of missing settings and plain problems, never the v
     assert.deepEqual(missingSettings(), ["ANTHROPIC_API_KEY", "FIREBASE_SERVICE_ACCOUNT", "SMTP_HOST", "SMTP_USER", "SMTP_PASS", "CRON_SECRET"]);
     assert.deepEqual(settingProblems("22.12.0"), []);
     assert.match(settingProblems("20.18.1")[0], /Node.js 20.18.1, but Firebase Admin needs 22/);
-    process.env.ANTHROPIC_API_KEY = '"sk-ant-abc"';
-    assert.match(settingProblems("22.12.0")[0], /does not start with sk-ant-/);
+    process.env.ANTHROPIC_API_KEY = "not-a-key"; // a placeholder counts as no key (simulated AI), without a warning
+    assert.ok(missingSettings().includes("ANTHROPIC_API_KEY"));
+    assert.deepEqual(settingProblems("22.12.0"), []);
+    process.env.ANTHROPIC_API_KEY = "sk-ant-api03-abc";
+    assert.ok(!missingSettings().includes("ANTHROPIC_API_KEY"));
     delete process.env.ANTHROPIC_API_KEY;
 
     Object.assign(process.env, { SMTP_HOST: "smtp.gmail.com", SMTP_USER: "a@b.c", SMTP_PASS: "  ", SMTP_PORT: "465 " });

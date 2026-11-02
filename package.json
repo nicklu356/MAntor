@@ -21,7 +21,7 @@
     "react-dom": "^19.3.0"
   },
   "engines": {
-    "node": ">=20.9 <25"
+    "node": "22.x"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

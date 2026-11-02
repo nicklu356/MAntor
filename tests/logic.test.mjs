@@ -433,18 +433,22 @@ test("server settings: names of missing settings and plain problems, never the v
   try {
     for (const name of names) delete process.env[name];
     assert.deepEqual(missingSettings(), ["ANTHROPIC_API_KEY", "FIREBASE_SERVICE_ACCOUNT", "SMTP_HOST", "SMTP_USER", "SMTP_PASS", "CRON_SECRET"]);
-    assert.deepEqual(settingProblems(), []);
+    assert.deepEqual(settingProblems("22.12.0"), []);
+    assert.match(settingProblems("20.18.1")[0], /Node.js 20.18.1, but Firebase Admin needs 22/);
+    process.env.ANTHROPIC_API_KEY = '"sk-ant-abc"';
+    assert.match(settingProblems("22.12.0")[0], /does not start with sk-ant-/);
+    delete process.env.ANTHROPIC_API_KEY;
 
     Object.assign(process.env, { SMTP_HOST: "smtp.gmail.com", SMTP_USER: "a@b.c", SMTP_PASS: "  ", SMTP_PORT: "465 " });
     assert.ok(missingSettings().includes("SMTP_PASS")); // blank counts as missing
 
     process.env.FIREBASE_SERVICE_ACCOUNT = '{"project_id": "my-app", "private_key": "secret-value"'; // cut short
-    assert.match(settingProblems()[0], /not valid JSON/);
-    assert.ok(!settingProblems().join().includes("secret-value"));
+    assert.match(settingProblems("22.12.0")[0], /not valid JSON/);
+    assert.ok(!settingProblems("22.12.0").join().includes("secret-value"));
 
     process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({ project_id: "other", private_key: "k", client_email: "e" });
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "my-app";
-    assert.match(settingProblems()[0], /for project "other", but the site uses "my-app"/);
+    assert.match(settingProblems("22.12.0")[0], /for project "other", but the site uses "my-app"/);
   } finally {
     for (const name of names) delete process.env[name];
     Object.assign(process.env, saved);

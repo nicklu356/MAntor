@@ -454,3 +454,19 @@ test("server settings: names of missing settings and plain problems, never the v
     Object.assign(process.env, saved);
   }
 });
+
+// ---- Server libraries load on any Node.js version Vercel may run ----
+import { spawnSync } from "node:child_process";
+
+test("server libraries load without require(esm) (older Node.js, as on some Vercel runtimes)", () => {
+  // firebase-admin 14 pulls in an ES-module-only jose through require(), which fails there
+  // ("ERR_REQUIRE_ESM"); keep to versions that load as CommonJS.
+  const script = ["firebase-admin/app", "firebase-admin/auth", "firebase-admin/firestore", "nodemailer"]
+    .map((name) => `require(${JSON.stringify(name)});`)
+    .join("");
+  const run = spawnSync(process.execPath, ["--no-experimental-require-module", "-e", script], {
+    cwd: new URL("..", import.meta.url).pathname,
+    encoding: "utf8",
+  });
+  assert.equal(run.status, 0, run.stderr.slice(0, 500));
+});

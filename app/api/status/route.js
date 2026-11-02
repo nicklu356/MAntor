@@ -31,6 +31,7 @@ export async function GET() {
       problems,
       // Which deployment is running (Vercel sets this), to spot an old deployment.
       version: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7) || "local",
+      node: process.versions.node,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

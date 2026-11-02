@@ -152,7 +152,7 @@ GitHub Actions runs all of them on every push to `main` and on every pull reques
 
 ### 1. Install once
 
-* [Node.js](https://nodejs.org) (LTS version)
+* [Node.js](https://nodejs.org) 22 (Firebase Admin needs 22 or newer; `package.json` asks Vercel for 22.x)
 * [Git](https://git-scm.com)
 * [VS Code](https://code.visualstudio.com) (recommended)
 

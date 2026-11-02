@@ -345,12 +345,22 @@ function EmailSettings() {
   const on = profile?.emailNotifications !== false;
 
   useEffect(() => {
-    fetch("/api/status")
-      .then((res) => res.json())
+    fetch("/api/status", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) =>
-        setMailStatus({ mail: Boolean(data.mail), admin: Boolean(data.admin), missing: data.missing || [], version: data.version })
+        setMailStatus({
+          mail: Boolean(data.mail),
+          admin: Boolean(data.admin),
+          missing: data.missing || [],
+          problems: data.problems || [],
+          version: data.version,
+        })
       )
-      .catch(() => setMailStatus({ mail: false, admin: false, missing: [] }));
+      // Not "not set up": the check itself failed, so say that instead of guessing.
+      .catch((e) => setMailStatus({ failed: e.message || "network error" }));
   }, []);
 
   async function toggle() {
@@ -389,22 +399,36 @@ function EmailSettings() {
       {authInfo && !authInfo.emailVerified && (
         <p className="status small">{t("Verify your email address first: emails only go to verified addresses.")}</p>
       )}
-      {mailStatus && !(mailStatus.mail && mailStatus.admin) && (
+      {mailStatus?.failed && (
+        <p className="status status-error small">
+          {t("Could not check the server's email settings ({error}). Open /api/status on this site to see why.", {
+            error: mailStatus.failed,
+          })}
+        </p>
+      )}
+      {mailStatus && !mailStatus.failed && !(mailStatus.mail && mailStatus.admin) && (
         <p className="muted small">
           {t("Email is not set up on this site yet, so nothing is sent for now.")}
         </p>
       )}
-      {/* Admins see exactly which server settings are missing, so they can fix it in Vercel. */}
-      {currentUser.admin && mailStatus && !(mailStatus.mail && mailStatus.admin) && (
+      {/* Admins see exactly which server settings are missing or wrong, so they can fix it in Vercel. */}
+      {currentUser.admin && mailStatus && !mailStatus.failed && (!(mailStatus.mail && mailStatus.admin) || mailStatus.problems.length > 0) && (
         <div className="status status-error small">
-          <strong>{t("The server cannot see:")}</strong>{" "}
-          {mailStatus.missing
-            .filter((name) => name !== "CRON_SECRET")
-            .map((name) => (
-              <code key={name} style={{ marginRight: 6 }}>
-                {name}
-              </code>
-            ))}
+          {mailStatus.missing.filter((name) => name !== "CRON_SECRET" && name !== "ANTHROPIC_API_KEY").length > 0 && (
+            <div>
+              <strong>{t("The server cannot see:")}</strong>{" "}
+              {mailStatus.missing
+                .filter((name) => name !== "CRON_SECRET" && name !== "ANTHROPIC_API_KEY")
+                .map((name) => (
+                  <code key={name} style={{ marginRight: 6 }}>
+                    {name}
+                  </code>
+                ))}
+            </div>
+          )}
+          {mailStatus.problems.map((problem) => (
+            <div key={problem}>⚠ {problem}</div>
+          ))}
           <div style={{ marginTop: 6 }}>
             {t(
               "Check the names are spelled exactly like this and ticked for Production in Vercel > Settings > Environment Variables. Then redeploy: settings only reach deployments made after you saved them."

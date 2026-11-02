@@ -2,14 +2,17 @@
 
 // Shows AI feedback for a task and lets the team request new feedback.
 // When there is more than one review, each score shows the change since the previous review.
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useUser } from "@/components/UserProvider";
 import { currentAuthUser } from "@/lib/auth";
-import { addFeedback, getFeedback } from "@/lib/db";
+import { addFeedback } from "@/lib/db";
+import { useLiveList } from "@/lib/live";
+import { useLocale, useT } from "@/components/LocaleProvider";
 
 export function ScoreDots({ score }) {
+  const t = useT();
   return (
-    <span className="score-dots" aria-label={`${score} out of 5`}>
+    <span className="score-dots" aria-label={t("{score} out of 5", { score })}>
       {[1, 2, 3, 4, 5].map((n) => (
         <span key={n} className={n <= score ? "dot on" : "dot"} />
       ))}
@@ -28,14 +31,15 @@ function Delta({ now, before }) {
 }
 
 export function ReviewBadges({ review }) {
+  const t = useT();
   return (
     <>
-      <span className="badge badge-blue">{review.source === "ai" ? "AI feedback" : "Mentor feedback"}</span>
-      {review.sample && <span className="badge badge-amber">Example</span>}
-      {review.simulated && <span className="badge badge-amber">Simulated</span>}
+      <span className="badge badge-blue">{review.source === "ai" ? t("AI feedback") : t("Mentor feedback")}</span>
+      {review.sample && <span className="badge badge-amber">{t("Example")}</span>}
+      {review.simulated && <span className="badge badge-amber">{t("Simulated")}</span>}
       {review.verified && (
-        <span className="badge badge-green" title="Scored and saved by the server, so it cannot be edited by learners">
-          ✓ Verified
+        <span className="badge badge-green" title={t("Scored and saved by the server, so it cannot be edited by learners")}>
+          {t("✓ Verified")}
         </span>
       )}
     </>
@@ -43,19 +47,14 @@ export function ReviewBadges({ review }) {
 }
 
 export default function FeedbackPanel({ project, task, teamId, contributions, canRequest, userId }) {
+  const t = useT();
   const { mode } = useUser();
-  const [items, setItems] = useState([]);
+  const { locale } = useLocale();
+  // Live: a review a teammate asks for appears here too. Newest first.
+  const live = useLiveList("feedback", "taskId", task.id);
+  const items = useMemo(() => [...(live || [])].reverse(), [live]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const load = useCallback(
-    () => getFeedback(task.id).then((list) => setItems([...list].reverse())),
-    [task.id]
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   async function requestFeedback() {
     setLoading(true);
@@ -66,10 +65,10 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ taskId: task.id, project, task, submission: task.submission, contributions }),
+        body: JSON.stringify({ taskId: task.id, project, task, submission: task.submission, contributions, locale }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
+      if (!res.ok) throw new Error(data.error || t("Request failed"));
       // Without a server key the browser saves it (unverified).
       if (!data.saved) await addFeedback({
         taskId: task.id,
@@ -80,7 +79,6 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
         simulated: data.simulated,
         requestedBy: userId || null,
       });
-      await load();
     } catch (e) {
       setError(e.message);
     }
@@ -96,18 +94,18 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
     <section className="card">
       <div className="spread">
         <div>
-          <h2>Feedback</h2>
-          <p className="muted small">AI reviews your submission against the mentor&apos;s criteria.</p>
+          <h2>{t("Feedback")}</h2>
+          <p className="muted small">{t("AI reviews your submission against the mentor's criteria.")}</p>
         </div>
         {canRequest && (
           <button className="btn" onClick={requestFeedback} disabled={loading || !task.submission || !project}>
-            {loading ? "Reviewing…" : latest ? "Get new feedback" : "Get AI feedback"}
+            {loading ? t("Reviewing…") : latest ? t("Get new feedback") : t("Get AI feedback")}
           </button>
         )}
       </div>
 
-      {canRequest && !task.submission && <p className="muted small">Submit your work first to get feedback.</p>}
-      {!canRequest && !latest && <p className="muted small">No feedback yet.</p>}
+      {canRequest && !task.submission && <p className="muted small">{t("Submit your work first to get feedback.")}</p>}
+      {!canRequest && !latest && <p className="muted small">{t("No feedback yet.")}</p>}
       {error && <p className="error">{error}</p>}
 
       {latest && (
@@ -133,7 +131,7 @@ export default function FeedbackPanel({ project, task, teamId, contributions, ca
           {earlier.length > 0 && (
             <details style={{ marginTop: 8 }}>
               <summary className="muted small" style={{ cursor: "pointer" }}>
-                {earlier.length} earlier review{earlier.length > 1 ? "s" : ""}
+                {t(earlier.length > 1 ? "{n} earlier reviews" : "{n} earlier review", { n: earlier.length })}
               </summary>
               <ul className="list-plain">
                 {earlier.map((review) => (

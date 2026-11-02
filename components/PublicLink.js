@@ -6,8 +6,10 @@ import { useEffect, useState } from "react";
 import { useToast } from "./Toast";
 import { useUser } from "./UserProvider";
 import { updateUser } from "@/lib/db";
+import { useT } from "./LocaleProvider";
 
 export default function PublicLink() {
+  const t = useT();
   const toast = useToast();
   const { currentUser, refreshUsers } = useUser();
   const [serverReady, setServerReady] = useState(null);
@@ -27,9 +29,9 @@ export default function PublicLink() {
     try {
       await updateUser(currentUser.id, { portfolioPublic: !isPublic });
       await refreshUsers();
-      toast(isPublic ? "Your portfolio is private again" : "Your portfolio is public");
+      toast(isPublic ? t("Your portfolio is private again") : t("Your portfolio is public"));
     } catch (e) {
-      toast(e.message || "Could not change it", "error");
+      toast(e.message || t("Could not change it"), "error");
     }
     setBusy(false);
   }
@@ -37,9 +39,9 @@ export default function PublicLink() {
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
-      toast("Link copied");
+      toast(t("Link copied"));
     } catch {
-      toast("Could not copy the link", "error");
+      toast(t("Could not copy the link"), "error");
     }
   }
 
@@ -47,32 +49,34 @@ export default function PublicLink() {
     <section className="card stack no-print">
       <div className="spread">
         <div>
-          <h2>Public link</h2>
+          <h2>{t("Public link")}</h2>
           <p className="muted small">
-            Share your experience on a CV or LinkedIn. Anyone with the link sees your name, photo, education (not your
-            date of birth), projects, verified scores and mentors&apos; feedback. No login needed.
+            {t(
+              "Share your experience on a CV or LinkedIn. Anyone with the link sees your name, photo, education (not your date of birth), projects, verified scores and mentors' feedback. No login needed."
+            )}
           </p>
         </div>
-        <span className={isPublic ? "badge badge-green" : "badge"}>{isPublic ? "Public" : "Private"}</span>
+        <span className={isPublic ? "badge badge-green" : "badge"}>{isPublic ? t("Public") : t("Private")}</span>
       </div>
       {serverReady === false && (
         <p className="notice small">
-          Public portfolios need the server key (FIREBASE_SERVICE_ACCOUNT, see README). Until it is set, the link shows
-          “unavailable”.
+          {t(
+            "Public portfolios need the server key (FIREBASE_SERVICE_ACCOUNT, see README). Until it is set, the link shows “unavailable”."
+          )}
         </p>
       )}
       <div className="row">
         <button className={isPublic ? "btn btn-ghost btn-small" : "btn btn-small"} onClick={toggle} disabled={busy}>
-          {isPublic ? "Make private" : "Make public"}
+          {isPublic ? t("Make private") : t("Make public")}
         </button>
         {isPublic && (
           <>
             <code className="small public-url">{url}</code>
             <button className="btn btn-secondary btn-small" onClick={copy}>
-              Copy link
+              {t("Copy link")}
             </button>
             <a className="small" href={url} target="_blank" rel="noreferrer">
-              Open ↗
+              {t("Open ↗")}
             </a>
           </>
         )}

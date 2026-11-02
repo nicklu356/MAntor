@@ -243,3 +243,183 @@ test("profile details: names, age limit and education", async () => {
   assert.equal(cleanProfile(ok).name, "Ada King");
   assert.equal(cleanProfile({ ...ok, graduationYear: "" }).graduationYear, null);
 });
+
+// ---- Language ----
+import zhTW from "../lib/i18n/zh-TW.js";
+import { pickLocale, translate, translator } from "../lib/i18n/index.js";
+
+test("translate: Chinese text with placeholders, English fallback for unknown text", () => {
+  assert.equal(translate("zh-TW", "Hi {name}", { name: "Mia" }), "嗨，Mia");
+  assert.equal(translate("en", "Hi {name}", { name: "Mia" }), "Hi Mia");
+  assert.equal(translate("zh-TW", "Text nobody translated"), "Text nobody translated");
+  assert.equal(translator("zh-TW")("{n} min ago", { n: 5 }), "5 分鐘前");
+  assert.equal(timeAgo(new Date(Date.now() - 5 * 60_000).toISOString(), Date.now(), translator("zh-TW")), "5 分鐘前");
+});
+
+test("pickLocale: the saved choice wins, then the browser language", () => {
+  assert.equal(pickLocale("en", "zh-TW,zh;q=0.9"), "en");
+  assert.equal(pickLocale(undefined, "zh-TW,zh;q=0.9"), "zh-TW");
+  assert.equal(pickLocale("fr", "en-US,en;q=0.9"), "en");
+  assert.equal(pickLocale(undefined, ""), "en");
+});
+
+test("zh-TW dictionary keeps every placeholder of its English key", () => {
+  const placeholders = (s) => (s.match(/\{\w+\}/g) || []).sort().join();
+  for (const [english, chinese] of Object.entries(zhTW)) {
+    assert.ok(chinese.trim(), `empty translation for "${english}"`);
+    assert.equal(placeholders(chinese), placeholders(english), `placeholders differ for "${english}"`);
+  }
+});
+
+test("every field, interest type and assessment activity has a translation", () => {
+  const missing = [];
+  for (const field of FIELDS) {
+    const info = FIELD_INFO[field];
+    for (const text of [field, info.blurb, info.summary, ...info.dayToDay, ...info.roles, ...info.skills]) {
+      if (!(text in zhTW)) missing.push(text);
+    }
+  }
+  for (const item of ITEMS) if (!(item.text in zhTW)) missing.push(item.text);
+  assert.deepEqual(missing, []);
+});
+
+test("every text the code passes to t() has a Traditional Chinese translation", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = new URL("..", import.meta.url).pathname;
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (path.endsWith(".js") && !path.includes("i18n")) files.push(path);
+    }
+  };
+  ["app", "components", "lib"].forEach((dir) => walk(join(root, dir)));
+  const literal = String.raw`("(?:[^"\\\n]|\\.)*")`;
+  const direct = new RegExp(String.raw`\bt\(\s*` + literal, "g"); // t("text")
+  const choice = new RegExp(String.raw`\bt\(\s*[^"()]*(?:\([^()]*\))?[^"()]*\?\s*` + literal + String.raw`\s*:\s*` + literal, "g"); // t(n > 1 ? "a" : "b")
+  const missing = new Set();
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const match of [...source.matchAll(direct), ...source.matchAll(choice)]) {
+      for (const text of match.slice(1).filter(Boolean).map((s) => JSON.parse(s))) {
+        if (!(text in zhTW)) missing.add(`${file.slice(root.length)}: ${text}`);
+      }
+    }
+  }
+  assert.deepEqual([...missing], []);
+});
+
+// ---- Deadlines and milestones ----
+import { dueLabel, dueState, milestones, planTeamSchedule, teamProgress, templateWeeks } from "../lib/schedule.js";
+import { buildAttention } from "../lib/attention.js";
+
+test("schedule: tasks spread over the weeks, each due at the end of its week", () => {
+  assert.deepEqual(templateWeeks([{}, {}, {}, {}], 4), [1, 2, 3, 4]);
+  assert.deepEqual(templateWeeks([{}, {}, {}, {}, {}, {}, {}, {}], 4), [1, 1, 2, 2, 3, 3, 4, 4]);
+  assert.deepEqual(templateWeeks([{ week: 3 }, { week: 99 }], 3), [3, 3]); // invalid weeks fall back to the spread
+  const plan = planTeamSchedule({ durationWeeks: 2, taskTemplates: [{}, { week: 1 }] }, "2026-12-28");
+  assert.equal(plan.endDate, "2027-01-11"); // across the new year
+  assert.deepEqual(plan.tasks, [{ week: 1, dueDate: "2027-01-04" }, { week: 1, dueDate: "2027-01-04" }]);
+});
+
+test("due state and label: late, today, tomorrow, soon, later; nothing once done", () => {
+  const t = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]);
+  const task = (dueDate, status = "todo") => ({ dueDate, status });
+  assert.equal(dueLabel(task("2026-11-01"), t, "2026-11-04"), "3 days late");
+  assert.equal(dueLabel(task("2026-11-03"), t, "2026-11-04"), "1 day late");
+  assert.equal(dueLabel(task("2026-11-04"), t, "2026-11-04"), "Due today");
+  assert.equal(dueLabel(task("2026-11-05"), t, "2026-11-04"), "Due tomorrow");
+  assert.equal(dueLabel(task("2026-11-07"), t, "2026-11-04"), "Due in 3 days");
+  assert.match(dueLabel(task("2026-11-20"), t, "2026-11-04"), /^Due 20 Nov/);
+  assert.equal(dueState(task("2026-11-01", "done"), "2026-11-04"), null);
+  assert.equal(dueState({ status: "todo" }, "2026-11-04"), null);
+});
+
+test("team progress and milestones", () => {
+  const team = { startDate: "2026-11-01", endDate: "2026-11-29", status: "active" };
+  const tasks = [
+    { id: "a", week: 1, dueDate: "2026-11-08", status: "done" },
+    { id: "b", week: 2, dueDate: "2026-11-15", status: "todo" },
+    { id: "c", week: 4, dueDate: "2026-11-29", status: "todo" },
+  ];
+  const progress = teamProgress(team, "2026-11-17");
+  assert.equal(progress.week, 3);
+  assert.equal(progress.weeks, 4);
+  assert.equal(progress.daysLeft, 12);
+  const steps = milestones(team, tasks, "2026-11-17");
+  assert.deepEqual(steps.map((s) => [s.week, s.done, s.late, s.current, s.tasks.length]), [
+    [1, true, false, false, 1],
+    [2, false, true, false, 1],
+    [3, false, false, true, 0],
+    [4, false, false, false, 1],
+  ]);
+  assert.equal(milestones({}, tasks).length, 0); // teams from before deadlines existed
+});
+
+test("deadlines reach the bell (learners) and the mentor's attention list (3+ days late)", () => {
+  const team = {
+    id: "team1",
+    status: "active",
+    project: { title: "P" },
+    tasks: [
+      { id: "a", title: "Research", dueDate: "2026-11-05", status: "todo", assigneeIds: [] },
+      { id: "b", title: "Draft", dueDate: "2026-11-01", status: "in_progress", assigneeIds: [] },
+    ],
+  };
+  const items = buildNotifications({ viewer: { id: "u1", role: "learner" }, teams: [team], userName: () => "x", today: "2026-11-04" });
+  assert.deepEqual(items.map((i) => i.text).sort(), ["“Draft” is past its due date", "“Research” is due tomorrow"]);
+  const mentorItems = buildNotifications({ viewer: { id: "m1", role: "mentor" }, teams: [team], userName: () => "x", today: "2026-11-04" });
+  assert.equal(mentorItems.length, 0);
+  const attention = buildAttention([team], "2026-11-04");
+  assert.deepEqual(attention.map((i) => [i.kind, i.late.length]), [["late", 1]]);
+  assert.equal(buildAttention([team], "2026-11-03").length, 0); // only 2 days late
+});
+
+// ---- Mentor weekly summary ----
+import { simulatedSummary, teamStatus, weekStats } from "../lib/weeklySummary.js";
+
+test("weekly summary: facts per team, anonymous names only, and a plain summary without AI", () => {
+  const now = Date.parse("2026-11-10T12:00:00Z");
+  const recent = "2026-11-08T10:00:00.000Z";
+  const old = "2026-10-20T10:00:00.000Z";
+  const teams = [
+    {
+      id: "busy",
+      status: "active",
+      startDate: "2026-11-01",
+      endDate: "2026-11-29",
+      memberIds: ["a", "b"],
+      project: { title: "Bank app" },
+      tasks: [
+        { id: "t1", title: "Interviews", status: "done", dueDate: "2026-11-08", submission: { submittedAt: recent, submittedBy: "a" } },
+        { id: "t2", title: "Problem", status: "todo", dueDate: "2026-11-07", helpRequest: { userId: "b", note: "Scope?", at: recent } },
+      ],
+      feedback: [],
+      comments: [{ userId: "a", createdAt: recent }],
+      contributions: [{ userId: "a", hoursSpent: 2, createdAt: recent }, { userId: "b", hoursSpent: 5, createdAt: old }],
+    },
+    { id: "calm", status: "active", memberIds: ["c"], project: { title: "Cafe" }, tasks: [{ id: "t3", title: "Plan", status: "todo" }], feedback: [], comments: [], contributions: [{ userId: "c", hoursSpent: 1, createdAt: recent }] },
+    { id: "gone", status: "disbanded", memberIds: [], project: { title: "Old" }, tasks: [] },
+  ];
+  const names = { a: "Learner #AAA", b: "Learner #BBB", c: "Learner #CCC" };
+  const stats = weekStats(teams, { anonymousName: (id) => names[id], now, today: "2026-11-10" });
+  assert.deepEqual(stats.teams.map((s) => s.teamId), ["busy", "calm"]); // active teams only
+  const busy = stats.teams[0];
+  assert.deepEqual(busy.members, ["Learner #AAA", "Learner #BBB"]);
+  assert.deepEqual(busy.submitted, ["Interviews"]);
+  assert.equal(busy.hours, 2); // last week only
+  assert.deepEqual(busy.late, [{ task: "Problem", days: 3 }]);
+  assert.deepEqual(busy.help, [{ task: "Problem", from: "Learner #BBB", note: "Scope?" }]);
+  assert.deepEqual(busy.quiet, ["Learner #BBB"]);
+  assert.equal(busy.week, 2);
+  assert.equal(teamStatus(busy), "stuck"); // open help request
+  assert.equal(teamStatus(stats.teams[1]), "on_track");
+
+  const summary = simulatedSummary(stats);
+  assert.equal(summary.overview, "2 active team(s): 1 on track, 0 need attention, 1 stuck.");
+  assert.equal(summary.teams[0].suggestion, "Answer the help request on “Problem”.");
+  assert.deepEqual(summary.priorities, ["Bank app: Answer the help request on “Problem”."]);
+  assert.equal(simulatedSummary({ teams: [] }).overview, "No active teams this week.");
+});

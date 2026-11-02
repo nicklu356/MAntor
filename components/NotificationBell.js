@@ -16,10 +16,12 @@ import {
 } from "@/lib/db";
 import { buildNotifications, countUnread } from "@/lib/notifications";
 import { timeAgo } from "@/lib/format";
+import { useT } from "./LocaleProvider";
 
 const seenKey = (userId) => `mantor-notifications-seen-${userId}`;
 
 export default function NotificationBell() {
+  const t = useT();
   const pathname = usePathname();
   const { currentUser, isMentor, userName, users, connections } = useUser();
   const [items, setItems] = useState([]);
@@ -34,7 +36,7 @@ export default function NotificationBell() {
       const teams = isMentor
         ? await getTeamsForMentor(currentUser.id)
         : await Promise.all(
-            (await getTeamsForUser(currentUser.id)).map(async (t) => ({ ...t, project: await getProject(t.projectId) }))
+            (await getTeamsForUser(currentUser.id)).map(async (item) => ({ ...item, project: await getProject(item.projectId) }))
           );
       const detailed = await Promise.all(
         teams.map(async (team) => {
@@ -48,7 +50,7 @@ export default function NotificationBell() {
         })
       );
       if (cancelled) return;
-      setItems(buildNotifications({ viewer: currentUser, teams: detailed, connections, userName, users }));
+      setItems(buildNotifications({ viewer: currentUser, teams: detailed, connections, userName, users, t }));
       try {
         setLastSeen(window.localStorage.getItem(seenKey(currentUser.id)));
       } catch {
@@ -59,7 +61,7 @@ export default function NotificationBell() {
       cancelled = true;
     };
     // pathname: refresh after navigating, so new activity shows up without a reload.
-  }, [currentUser, isMentor, connections, userName, users, pathname]);
+  }, [currentUser, isMentor, connections, userName, users, pathname, t]);
 
   useEffect(() => {
     setOpen(false);
@@ -96,7 +98,7 @@ export default function NotificationBell() {
         className="bell-button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={unread ? t("Notifications, {n} unread", { n: unread }) : t("Notifications")}
       >
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
           <path
@@ -109,15 +111,15 @@ export default function NotificationBell() {
       {open && (
         <div className="bell-panel card">
           <div className="spread">
-            <strong>Notifications</strong>
+            <strong>{t("Notifications")}</strong>
             {unread > 0 && (
               <button className="btn btn-ghost btn-small" onClick={markAllRead}>
-                Mark all read
+                {t("Mark all read")}
               </button>
             )}
           </div>
           {items.length === 0 ? (
-            <p className="muted small">Nothing yet. Activity in your teams shows up here.</p>
+            <p className="muted small">{t("Nothing yet. Activity in your teams shows up here.")}</p>
           ) : (
             <ul className="list-plain bell-list">
               {items.slice(0, 15).map((item) => {
@@ -128,7 +130,7 @@ export default function NotificationBell() {
                       {item.text}
                     </Link>
                     {item.detail && <div className="muted small clamp-2">{item.detail}</div>}
-                    <div className="muted small">{timeAgo(item.at)}</div>
+                    <div className="muted small">{timeAgo(item.at, Date.now(), t)}</div>
                   </li>
                 );
               })}

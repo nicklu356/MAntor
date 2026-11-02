@@ -8,8 +8,10 @@ import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { requestHelp, resolveHelp } from "@/lib/db";
 import { timeAgo } from "@/lib/format";
+import { useT } from "@/components/LocaleProvider";
 
 export default function HelpRequest({ task, isMember, isProjectMentor, onChange }) {
+  const t = useT();
   const toast = useToast();
   const { currentUser, userName } = useUser();
   const [open, setOpen] = useState(false);
@@ -22,12 +24,12 @@ export default function HelpRequest({ task, isMember, isProjectMentor, onChange 
     setBusy(true);
     try {
       await requestHelp(task.id, currentUser.id, note);
-      toast("Your mentor has been asked. Watch the discussion for their reply.");
+      toast(t("Your mentor has been asked. Watch the discussion for their reply."));
       setOpen(false);
       setNote("");
       onChange?.();
     } catch (e) {
-      toast(e.message || "Could not send the request", "error");
+      toast(e.message || t("Could not send the request"), "error");
     }
     setBusy(false);
   }
@@ -36,10 +38,10 @@ export default function HelpRequest({ task, isMember, isProjectMentor, onChange 
     setBusy(true);
     try {
       await resolveHelp(task.id, currentUser.id);
-      toast("Marked as answered");
+      toast(t("Marked as answered"));
       onChange?.();
     } catch (e) {
-      toast(e.message || "Could not update the request", "error");
+      toast(e.message || t("Could not update the request"), "error");
     }
     setBusy(false);
   }
@@ -50,21 +52,21 @@ export default function HelpRequest({ task, isMember, isProjectMentor, onChange 
         <div className="spread">
           <div>
             <strong>
-              {isProjectMentor ? `${userName(help.userId)} asked for your help` : "Waiting for the mentor"}
+              {isProjectMentor ? t("{name} asked for your help", { name: userName(help.userId) }) : t("Waiting for the mentor")}
             </strong>
             <div className="muted small">
-              {isProjectMentor ? "" : `Asked by ${userName(help.userId)} · `}
-              {timeAgo(help.at)}
+              {isProjectMentor ? "" : `${t("Asked by {name}", { name: userName(help.userId) })} · `}
+              {timeAgo(help.at, Date.now(), t)}
             </div>
           </div>
           {isProjectMentor && (
             <button className="btn btn-small" onClick={resolve} disabled={busy}>
-              Mark as answered
+              {t("Mark as answered")}
             </button>
           )}
         </div>
         {help.note && <blockquote className="quote">{help.note}</blockquote>}
-        {isProjectMentor && <p className="muted small">Reply in the team discussion below, then mark it as answered.</p>}
+        {isProjectMentor && <p className="muted small">{t("Reply in the team discussion below, then mark it as answered.")}</p>}
       </section>
     );
   }
@@ -75,16 +77,18 @@ export default function HelpRequest({ task, isMember, isProjectMentor, onChange 
     <section className="card help-card">
       <div className="spread">
         <div>
-          <strong>Still stuck?</strong>
+          <strong>{t("Still stuck?")}</strong>
           <div className="muted small">
             {help?.resolvedAt
-              ? `Your mentor answered the last request ${timeAgo(help.resolvedAt)}. You can ask again.`
-              : "Try the AI coach first. If the team is still stuck, ask your mentor."}
+              ? t("Your mentor answered the last request {when}. You can ask again.", {
+                  when: timeAgo(help.resolvedAt, Date.now(), t),
+                })
+              : t("Try the AI coach first. If the team is still stuck, ask your mentor.")}
           </div>
         </div>
         {!open && (
           <button className="btn btn-secondary btn-small" onClick={() => setOpen(true)}>
-            Ask the mentor
+            {t("Ask the mentor")}
           </button>
         )}
       </div>
@@ -95,15 +99,15 @@ export default function HelpRequest({ task, isMember, isProjectMentor, onChange 
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
             style={{ minHeight: 70 }}
-            placeholder="What have you tried, and where exactly are you stuck?"
-            aria-label="What you need help with"
+            placeholder={t("What have you tried, and where exactly are you stuck?")}
+            aria-label={t("What you need help with")}
           />
           <div className="row">
             <button className="btn btn-small" onClick={send} disabled={busy || !note.trim()}>
-              {busy ? "Sending…" : "Send to mentor"}
+              {busy ? t("Sending…") : t("Send to mentor")}
             </button>
             <button className="btn btn-ghost btn-small" onClick={() => setOpen(false)} disabled={busy}>
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>

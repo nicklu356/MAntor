@@ -4,10 +4,12 @@
 // The chat is private to the learner and kept in this browser.
 import { useEffect, useRef, useState } from "react";
 import { MAX_COACH_MESSAGE_CHARS } from "@/lib/config";
+import { useLocale } from "@/components/LocaleProvider";
 
 const storageKey = (userId, taskId) => `mantor-coach-${userId}-${taskId}`;
 
 export default function CoachPanel({ project, task, criteria, draft, userId }) {
+  const { t, locale } = useLocale();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,10 +54,11 @@ export default function CoachPanel({ project, task, criteria, draft, userId }) {
           criteria: criteria.map((c) => ({ name: c.name, description: c.description })),
           draft,
           messages: next.map(({ role, content }) => ({ role, content })),
+          locale,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "The coach could not answer");
+      if (!res.ok) throw new Error(data.error || t("The coach could not answer"));
       save([...next, { role: "assistant", content: data.reply, simulated: data.simulated }]);
     } catch (e) {
       setError(e.message);
@@ -64,23 +67,23 @@ export default function CoachPanel({ project, task, criteria, draft, userId }) {
   }
 
   const suggestions = [
-    "Where should I start?",
-    draft ? "Is my draft good enough yet?" : "What would a strong answer include?",
-    criteria[0] && `What does "${criteria[0].name}" mean in practice?`,
+    t("Where should I start?"),
+    draft ? t("Is my draft good enough yet?") : t("What would a strong answer include?"),
+    criteria[0] && t('What does "{name}" mean in practice?', { name: criteria[0].name }),
   ].filter(Boolean);
 
   return (
     <section className="card">
       <div className="spread">
         <div>
-          <h2>Ask the AI coach</h2>
+          <h2>{t("Ask the AI coach")}</h2>
           <p className="muted small">
-            Stuck? The coach gives hints and asks questions, but won&apos;t do the task for you. Only you see this chat.
+            {t("Stuck? The coach gives hints and asks questions, but won't do the task for you. Only you see this chat.")}
           </p>
         </div>
         {messages.length > 0 && (
           <button className="btn btn-ghost btn-small" onClick={() => save([])} disabled={loading}>
-            Clear chat
+            {t("Clear chat")}
           </button>
         )}
       </div>
@@ -89,11 +92,11 @@ export default function CoachPanel({ project, task, criteria, draft, userId }) {
         <div className="chat" ref={listRef}>
           {messages.map((m, i) => (
             <div key={i} className={m.role === "user" ? "bubble bubble-me" : "bubble"}>
-              {m.simulated && <span className="badge badge-amber">Simulated</span>}
+              {m.simulated && <span className="badge badge-amber">{t("Simulated")}</span>}
               <div className="pre">{m.content}</div>
             </div>
           ))}
-          {loading && <div className="bubble muted">Thinking…</div>}
+          {loading && <div className="bubble muted">{t("Thinking…")}</div>}
         </div>
       )}
 
@@ -115,12 +118,12 @@ export default function CoachPanel({ project, task, criteria, draft, userId }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={MAX_COACH_MESSAGE_CHARS}
-          placeholder="Ask about this task…"
-          aria-label="Question for the AI coach"
+          placeholder={t("Ask about this task…")}
+          aria-label={t("Question for the AI coach")}
           disabled={loading}
         />
         <button className="btn btn-secondary" disabled={loading || !text.trim()}>
-          Ask
+          {t("Ask")}
         </button>
       </form>
       {error && <p className="error">{error}</p>}

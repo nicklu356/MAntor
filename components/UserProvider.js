@@ -18,18 +18,21 @@ import {
   getConnectionsForLearner,
   getConnectionsForMentor,
   getProfile,
+  saveSettings,
   getTeamNames,
   getTeamPhotos,
   getTeamsForUser,
   getUsers,
 } from "@/lib/db";
 import { isProfileComplete } from "@/lib/profile";
+import { useLocale } from "@/components/LocaleProvider";
 import { getMode } from "@/lib/session";
 
 const UserContext = createContext(null);
 const STORAGE_KEY = "pdl-current-user";
 
 export function UserProvider({ children }) {
+  const { t, locale } = useLocale();
   const pathname = usePathname();
   const [mode, setMode] = useState(null); // decided in the browser (it reads localStorage)
   const [users, setUsers] = useState([]);
@@ -107,6 +110,13 @@ export function UserProvider({ children }) {
     if (mode === "auth" && currentUserId) setProfile(await getProfile(currentUserId));
   }, [mode, currentUserId]);
 
+  // Emails are written in the language you last used on the site.
+  useEffect(() => {
+    if (mode !== "auth" || !currentUserId || !profile || profile.language === locale) return;
+    setProfile((current) => (current ? { ...current, language: locale } : current));
+    saveSettings(currentUserId, { language: locale }).catch(() => {});
+  }, [mode, currentUserId, profile, locale]);
+
   const refreshProfile = useCallback(async () => {
     if (mode !== "auth" || !currentUserId) return;
     setProfile(await getProfile(currentUserId));
@@ -157,7 +167,7 @@ export function UserProvider({ children }) {
     if (mode !== "auth" || !currentUser || isMentor) return;
     let cancelled = false;
     getTeamsForUser(currentUser.id)
-      .then((teams) => Promise.all(teams.map(async (t) => [await getTeamNames(t.id), await getTeamPhotos(t.id)])))
+      .then((teams) => Promise.all(teams.map(async (item) => [await getTeamNames(item.id), await getTeamPhotos(item.id)])))
       .then((groups) => {
         if (cancelled) return;
         setTeamNames(Object.assign({}, ...groups.map((g) => g[0])));
@@ -193,14 +203,14 @@ export function UserProvider({ children }) {
   const userName = useCallback(
     (id) => {
       const user = users.find((u) => u.id === id);
-      if (!user) return "Unknown";
+      if (!user) return t("Former member"); // the account was deleted
       if (currentUser && id === currentUser.id) return currentUser.name || user.anonymousName;
       if (isMentor && user.role === "learner") {
         return revealed.has(id) ? revealed.get(id) || user.name || user.anonymousName : user.anonymousName;
       }
       return user.name || teamNames[id] || user.anonymousName;
     },
-    [users, currentUser, isMentor, revealed, teamNames]
+    [users, currentUser, isMentor, revealed, teamNames, t]
   );
 
   // A person's photo, with the same privacy as their name (null = show initials).

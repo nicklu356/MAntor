@@ -17,6 +17,7 @@ import {
   tooManyRequests,
 } from "@/lib/server/ai";
 import { adminDb, hasAdmin, readDoc, readWhere, requestUser } from "@/lib/server/firebaseAdmin";
+import { LOCALES, aiLanguage, translator } from "@/lib/i18n";
 
 const SYSTEM_PROMPT = `You are a supportive industry mentor reviewing work from a beginner learner on a project-based learning platform.
 Score the submission ONLY against the mentor's criteria provided.
@@ -74,20 +75,24 @@ function buildPrompt({ project, task, submission, contributions, criteria }) {
   ].join("\n");
 }
 
-function simulatedFeedback({ criteria, submission }, reason) {
+function simulatedFeedback({ criteria, submission }, reason, t) {
   const length = submission.content.trim().length;
   const score = Math.max(2, Math.min(4, Math.round(length / 120) + 2));
   const why =
     reason === "error"
-      ? "The AI service could not be reached, so this is simulated feedback."
-      : "This is simulated feedback because no Claude API key is set. Add ANTHROPIC_API_KEY to .env.local to get real AI feedback.";
+      ? t("The AI service could not be reached, so this is simulated feedback.")
+      : t(
+          "This is simulated feedback because no Claude API key is set. Add ANTHROPIC_API_KEY to .env.local to get real AI feedback."
+        );
   return {
     scores: criteria.map((c) => ({
       criteriaId: c.id,
       score,
-      comment: `Check your work against this standard: "${c.description}" Add specific evidence that shows you met it.`,
+      comment: t('Check your work against this standard: "{standard}" Add specific evidence that shows you met it.', {
+        standard: c.description,
+      }),
     })),
-    summary: `${why} Longer, more specific submissions score higher in the simulation.`,
+    summary: `${why} ${t("Longer, more specific submissions score higher in the simulation.")}`,
     simulated: true,
   };
 }
@@ -121,10 +126,16 @@ function buildInput({ project, task, submission, contributions }) {
 }
 
 // Claude's review, or the simulated one without a key or when the AI call fails.
-async function review(input) {
-  if (!hasAI()) return simulatedFeedback(input, "no-key");
+// locale: the language the learner uses (see lib/i18n); Claude answers in it.
+async function review(input, locale) {
+  const t = translator(locale);
+  if (!hasAI()) return simulatedFeedback(input, "no-key", t);
   try {
-    const output = await askJson({ system: SYSTEM_PROMPT, prompt: buildPrompt(input), schema: FEEDBACK_SCHEMA });
+    const output = await askJson({
+      system: `${SYSTEM_PROMPT}\n${aiLanguage(locale)}`,
+      prompt: buildPrompt(input),
+      schema: FEEDBACK_SCHEMA,
+    });
     const validIds = new Set(input.criteria.map((c) => c.id));
     const scores = (output.scores || [])
       .filter((s) => validIds.has(s.criteriaId))
@@ -137,14 +148,14 @@ async function review(input) {
     return { scores, summary: String(output.summary || ""), simulated: false };
   } catch (error) {
     console.error("AI feedback failed, using simulated feedback:", error);
-    return simulatedFeedback(input, "error");
+    return simulatedFeedback(input, "error", t);
   }
 }
 
 // Real accounts with FIREBASE_SERVICE_ACCOUNT set: the server reads the task from Firestore itself,
 // checks the caller is in the team, and saves the review marked `verified`. Nothing the browser
 // sends can change the scores.
-async function reviewAndSave(request, taskId) {
+async function reviewAndSave(request, taskId, locale) {
   const user = await requestUser(request);
   if (!user) return Response.json({ error: "Please log in again." }, { status: 401 });
   const task = await readDoc("tasks", String(taskId));
@@ -164,7 +175,7 @@ async function reviewAndSave(request, taskId) {
     const limit = rateLimit(request);
     if (!limit.ok) return tooManyRequests(limit.retryAfter);
   }
-  const result = await review(built.input);
+  const result = await review(built.input, locale);
   const id = `fb_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const record = {
     taskId: task.id,
@@ -188,10 +199,11 @@ export async function POST(request) {
   const parsed = await readJson(request);
   if (parsed.error) return Response.json({ error: parsed.error }, { status: parsed.status });
   const body = parsed.body || {};
+  const locale = LOCALES.includes(body.locale) ? body.locale : "en";
 
   if (body.taskId && hasAdmin() && request.headers.get("authorization")) {
     try {
-      return await reviewAndSave(request, body.taskId);
+      return await reviewAndSave(request, body.taskId, locale);
     } catch (error) {
       console.error("Saving verified feedback failed:", error);
       return Response.json({ error: "The review could not be saved. Please try again." }, { status: 500 });
@@ -205,5 +217,5 @@ export async function POST(request) {
     const limit = rateLimit(request);
     if (!limit.ok) return tooManyRequests(limit.retryAfter);
   }
-  return Response.json(await review(built.input));
+  return Response.json(await review(built.input, locale));
 }

@@ -23,6 +23,7 @@ import {
 import { average } from "@/lib/format";
 import PublicLink from "@/components/PublicLink";
 import { buildCriteriaResults } from "@/lib/progress";
+import { useT } from "@/components/LocaleProvider";
 
 async function loadPortfolio(userId) {
   const teams = await getTeamsForUser(userId);
@@ -47,8 +48,8 @@ async function loadPortfolio(userId) {
         comments,
         results: buildCriteriaResults(project, tasks, feedback).filter((r) => r.latestScore != null),
         final: finals[finals.length - 1] || null,
-        contributions: mine.map((c) => ({ ...c, taskTitle: tasks.find((t) => t.id === c.taskId)?.title })),
-        submitted: tasks.filter((t) => t.submission?.submittedBy === userId).length,
+        contributions: mine.map((c) => ({ ...c, taskTitle: tasks.find((item) => item.id === c.taskId)?.title })),
+        submitted: tasks.filter((item) => item.submission?.submittedBy === userId).length,
       };
     })
   );
@@ -59,6 +60,7 @@ async function loadPortfolio(userId) {
 }
 
 export default function PortfolioPage() {
+  const t = useT();
   const { id } = useParams();
   const toast = useToast();
   const { mode, currentUser, users, userName } = useUser();
@@ -72,8 +74,8 @@ export default function PortfolioPage() {
     });
   }, [id]);
 
-  if (learner === undefined) return <p className="muted">Loading…</p>;
-  if (learner === null) return <p className="card">Portfolio not found.</p>;
+  if (learner === undefined) return <p className="muted">{t("Loading…")}</p>;
+  if (learner === null) return <p className="card">{t("Portfolio not found.")}</p>;
 
   const isOwner = currentUser?.id === learner.id;
   const all = entries || [];
@@ -94,9 +96,9 @@ export default function PortfolioPage() {
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast("Link copied");
+      toast(t("Link copied"));
     } catch {
-      toast("Could not copy the link", "error");
+      toast(t("Could not copy the link"), "error");
     }
   }
 
@@ -105,40 +107,43 @@ export default function PortfolioPage() {
       <section className="card portfolio-head">
         <div className="spread">
           <div>
-            <div className="eyebrow">Project portfolio</div>
+            <div className="eyebrow">{t("Project portfolio")}</div>
             <h1>{userName(learner.id)}</h1>
-            {learner.careerField && <p className="muted">Building experience in {learner.careerField}</p>}
+            {learner.careerField && <p className="muted">{t("Building experience in {field}", { field: t(learner.careerField) })}</p>}
           </div>
           <div className="row no-print">
             <button className="btn btn-secondary btn-small" onClick={copyLink}>
-              Copy link
+              {t("Copy link")}
             </button>
             <button className="btn btn-small" onClick={() => window.print()}>
-              Save as PDF
+              {t("Save as PDF")}
             </button>
           </div>
         </div>
         <div className="stats">
           <div className="stat">
             <div className="stat-value">{all.length}</div>
-            <div className="muted small">Projects</div>
+            <div className="muted small">{t("Projects")}</div>
           </div>
           <div className="stat">
             <div className="stat-value">{all.filter((e) => e.team.status === "completed").length}</div>
-            <div className="muted small">Completed with mentor review</div>
+            <div className="muted small">{t("Completed with mentor review")}</div>
           </div>
           <div className="stat">
             <div className="stat-value">{hours}h</div>
-            <div className="muted small">Recorded contribution</div>
+            <div className="muted small">{t("Recorded contribution")}</div>
           </div>
           <div className="stat">
             <div className="stat-value">{avg == null ? "–" : `${avg.toFixed(1)}/5`}</div>
-            <div className="muted small">Average criteria score{improved ? ` · ${improved} improved after feedback` : ""}</div>
+            <div className="muted small">
+              {t("Average criteria score")}
+              {improved ? ` · ${t("{n} improved after feedback", { n: improved })}` : ""}
+            </div>
           </div>
         </div>
         {strengths.length > 0 && (
           <div className="row" style={{ marginTop: 12 }}>
-            <span className="muted small">Strong in:</span>
+            <span className="muted small">{t("Strong in:")}</span>
             {strengths.map((s) => (
               <span key={s} className="badge badge-blue">
                 {s}
@@ -153,9 +158,9 @@ export default function PortfolioPage() {
       {entries && (isOwner || earned.length > 0) && (
         <section className="card">
           <div className="spread">
-            <h2>Achievements</h2>
+            <h2>{t("Achievements")}</h2>
             <span className="badge badge-blue">
-              {earned.length} of {achievements.length}
+              {t("{n} of {total}", { n: earned.length, total: achievements.length })}
             </span>
           </div>
           <div className="achievements">
@@ -165,9 +170,9 @@ export default function PortfolioPage() {
                   {a.icon}
                 </span>
                 <div>
-                  <strong>{a.title}</strong>
+                  <strong>{t(a.title)}</strong>
                   <div className="muted small">
-                    {a.description}
+                    {t(a.description)}
                     {a.progress && ` (${a.progress})`}
                   </div>
                 </div>
@@ -180,10 +185,10 @@ export default function PortfolioPage() {
       {entries === null && <div className="card skeleton" />}
       {entries?.length === 0 && (
         <div className="card">
-          <p className="muted">No projects yet.</p>
+          <p className="muted">{t("No projects yet.")}</p>
           {isOwner && (
             <Link href="/projects" className="btn btn-secondary">
-              Find a project
+              {t("Find a project")}
             </Link>
           )}
         </div>
@@ -196,30 +201,33 @@ export default function PortfolioPage() {
             <div className="spread">
               <div>
                 <div className="row">
-                  <span className="badge badge-blue">{e.project.field}</span>
+                  <span className="badge badge-blue">{t(e.project.field)}</span>
                   {e.team.status === "completed" ? (
-                    <span className="badge badge-green">✓ Completed · reviewed by mentor</span>
+                    <span className="badge badge-green">{t("✓ Completed · reviewed by mentor")}</span>
                   ) : (
-                    <span className="badge">In progress</span>
+                    <span className="badge">{t("In progress")}</span>
                   )}
                 </div>
                 <h2 style={{ marginTop: 8 }}>{e.project.title}</h2>
                 <div className="muted small">
-                  Scenario by {e.project.company} · team of {e.team.memberIds.length} ·{" "}
-                  {e.tasks.filter((t) => t.status === "done").length} of {e.tasks.length} tasks done · {e.submitted}{" "}
-                  submitted by this learner
+                  {t("Scenario by {company} · team of {n}", { company: e.project.company, n: e.team.memberIds.length })} ·{" "}
+                  {t("{done} of {total} tasks done", {
+                    done: e.tasks.filter((item) => item.status === "done").length,
+                    total: e.tasks.length,
+                  })}{" "}
+                  · {t("{n} submitted by this learner", { n: e.submitted })}
                 </div>
               </div>
               {(isOwner || e.team.memberIds.includes(currentUser?.id)) && (
                 <Link href={`/teams/${e.team.id}`} className="btn btn-ghost btn-small no-print">
-                  Open team →
+                  {t("Open team →")}
                 </Link>
               )}
             </div>
 
             {e.final && (
               <div>
-                <div className="eyebrow">Mentor&apos;s final feedback</div>
+                <div className="eyebrow">{t("Mentor's final feedback")}</div>
                 <blockquote className="quote">{e.final.summary}</blockquote>
                 {mentor && (
                   <div className="muted small">
@@ -231,9 +239,9 @@ export default function PortfolioPage() {
 
             <div className="analysis-grid">
               <div>
-                <div className="eyebrow">Team results against the mentor&apos;s criteria</div>
+                <div className="eyebrow">{t("Team results against the mentor's criteria")}</div>
                 {e.results.length === 0 ? (
-                  <p className="muted small">No reviewed work yet.</p>
+                  <p className="muted small">{t("No reviewed work yet.")}</p>
                 ) : (
                   e.results.map((r) => (
                     <div key={r.key} className="score-row">
@@ -249,9 +257,9 @@ export default function PortfolioPage() {
                 )}
               </div>
               <div>
-                <div className="eyebrow">What this learner did</div>
+                <div className="eyebrow">{t("What this learner did")}</div>
                 {e.contributions.length === 0 ? (
-                  <p className="muted small">No contributions recorded.</p>
+                  <p className="muted small">{t("No contributions recorded.")}</p>
                 ) : (
                   <ul className="bullets">
                     {e.contributions.map((c) => (
@@ -271,8 +279,9 @@ export default function PortfolioPage() {
       })}
 
       <p className="muted small">
-        Scores come from AI feedback against criteria written by industry mentors. Projects are realistic scenarios,
-        not client work.
+        {t(
+          "Scores come from AI feedback against criteria written by industry mentors. Projects are realistic scenarios, not client work."
+        )}
       </p>
     </div>
   );

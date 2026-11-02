@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useUser } from "./UserProvider";
 import { saveProfile } from "@/lib/db";
 import { EDUCATION_LEVELS, MIN_AGE, validateProfile } from "@/lib/profile";
+import { useT } from "./LocaleProvider";
 
 const fromProfile = (p) => ({
   firstName: p?.firstName || "",
@@ -18,6 +19,7 @@ const fromProfile = (p) => ({
 });
 
 export default function ProfileForm({ submitLabel, onSaved }) {
+  const t = useT();
   const { currentUser, profile, refreshProfile, authInfo } = useUser();
   const [form, setForm] = useState(() => fromProfile(profile));
   const [saving, setSaving] = useState(false);
@@ -28,7 +30,7 @@ export default function ProfileForm({ submitLabel, onSaved }) {
 
   async function submit(e) {
     e.preventDefault();
-    const problem = validateProfile(form);
+    const problem = validateProfile(form, new Date(), t);
     if (problem) return setError(problem);
     setSaving(true);
     setError("");
@@ -37,7 +39,7 @@ export default function ProfileForm({ submitLabel, onSaved }) {
       await refreshProfile();
       onSaved?.();
     } catch (err) {
-      setError(err.message || "Could not save your details");
+      setError(err.message || t("Could not save your details"));
     }
     setSaving(false);
   }
@@ -46,15 +48,15 @@ export default function ProfileForm({ submitLabel, onSaved }) {
     <form onSubmit={submit} className="stack" noValidate>
       <div className="form-row">
         <label className="field">
-          First name
+          {t("First name")}
           <input value={form.firstName} onChange={(e) => set({ firstName: e.target.value })} autoComplete="given-name" maxLength={40} />
         </label>
         <label className="field">
-          Last name
+          {t("Last name")}
           <input value={form.lastName} onChange={(e) => set({ lastName: e.target.value })} autoComplete="family-name" maxLength={40} />
         </label>
         <label className="field">
-          Date of birth
+          {t("Date of birth")}
           <input
             type="date"
             value={form.dateOfBirth}
@@ -68,22 +70,24 @@ export default function ProfileForm({ submitLabel, onSaved }) {
 
       <div className="form-row">
         <label className="field">
-          Highest education
+          {t("Highest education")}
           <select value={form.educationLevel} onChange={(e) => set({ educationLevel: e.target.value })}>
-            <option value="">Choose…</option>
+            <option value="">{t("Choose…")}</option>
             {EDUCATION_LEVELS.map((l) => (
-              <option key={l}>{l}</option>
+              <option key={l} value={l}>
+                {t(l)}
+              </option>
             ))}
           </select>
         </label>
         <label className="field">
-          Graduation year (optional)
+          {t("Graduation year (optional)")}
           <input
             type="number"
             inputMode="numeric"
             value={form.graduationYear}
             onChange={(e) => set({ graduationYear: e.target.value })}
-            placeholder={`e.g. ${today.getFullYear()} (or expected)`}
+            placeholder={t("e.g. {year} (or expected)", { year: today.getFullYear() })}
             min="1950"
             max={today.getFullYear() + 8}
           />
@@ -91,28 +95,29 @@ export default function ProfileForm({ submitLabel, onSaved }) {
       </div>
       <div className="form-row">
         <label className="field">
-          School or university
+          {t("School or university")}
           <input
             value={form.school}
             onChange={(e) => set({ school: e.target.value })}
             maxLength={100}
-            placeholder="e.g. University of Melbourne"
+            placeholder={t("e.g. University of Melbourne")}
           />
         </label>
         <label className="field">
-          Field of study
+          {t("Field of study")}
           <input
             value={form.fieldOfStudy}
             onChange={(e) => set({ fieldOfStudy: e.target.value })}
             maxLength={100}
-            placeholder="e.g. Computer Science"
+            placeholder={t("e.g. Computer Science")}
           />
         </label>
       </div>
 
       <p className="muted small">
-        Only you can see your date of birth and education. Teammates see your name; mentors see{" "}
-        {currentUser?.anonymousName || "an anonymous name"}.
+        {t("Only you can see your date of birth and education. Teammates see your name; mentors see {anon}.", {
+          anon: currentUser?.anonymousName || t("an anonymous name"),
+        })}
       </p>
       {error && <p className="error">{error}</p>}
       <div>

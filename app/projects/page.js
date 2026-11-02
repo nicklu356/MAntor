@@ -7,8 +7,10 @@ import { useUser } from "@/components/UserProvider";
 import { matchPercent } from "@/lib/assessment";
 import { DIFFICULTIES } from "@/lib/config";
 import { getProjects } from "@/lib/db";
+import { useT } from "@/components/LocaleProvider";
 
 export default function ProjectsPage() {
+  const t = useT();
   const { currentUser, isMentor } = useUser();
   const [projects, setProjects] = useState(null);
   const [field, setField] = useState("All");
@@ -47,9 +49,9 @@ export default function ProjectsPage() {
     <div>
       <div className="spread">
         <div>
-          <h1>Projects</h1>
+          <h1>{t("Projects")}</h1>
           <p className="muted">
-            Realistic workplace scenarios from industry mentors. Pick one and work on it with a team.
+            {t("Realistic workplace scenarios from industry mentors. Pick one and work on it with a team.")}
           </p>
         </div>
         {isMentor && (
@@ -61,7 +63,8 @@ export default function ProjectsPage() {
 
       {!isMentor && currentUser && !currentUser.careerField && (
         <p className="card">
-          Not sure which project fits you? <Link href="/assessment">Take the career assessment</Link> to see matches first.
+          {t("Not sure which project fits you?")} <Link href="/assessment">{t("Take the career assessment")}</Link>{" "}
+          {t("to see matches first.")}
         </p>
       )}
 
@@ -70,15 +73,15 @@ export default function ProjectsPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search projects, companies or skills"
-          aria-label="Search projects"
+          placeholder={t("Search projects, companies or skills")}
+          aria-label={t("Search projects")}
           className="search"
         />
         <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} aria-label="Difficulty">
-          <option value="Any">Any level</option>
+          <option value="Any">{t("Any level")}</option>
           {DIFFICULTIES.map((d) => (
             <option key={d} value={d}>
-              {d[0].toUpperCase() + d.slice(1)}
+              {t(d[0].toUpperCase() + d.slice(1))}
             </option>
           ))}
         </select>
@@ -87,7 +90,7 @@ export default function ProjectsPage() {
       <div className="chips">
         {fields.map((f) => (
           <button key={f} className={f === field ? "chip active" : "chip"} onClick={() => setField(f)}>
-            {f}
+            {f === "All" ? t("All") : t(f)}
           </button>
         ))}
       </div>
@@ -101,7 +104,7 @@ export default function ProjectsPage() {
       )}
       {projects && visible.length === 0 && (
         <p className="card muted">
-          No projects match. Try another field or clear the search.
+          {t("No projects match. Try another field or clear the search.")}
         </p>
       )}
 
@@ -109,19 +112,20 @@ export default function ProjectsPage() {
         {visible.map((p) => (
           <Link key={p.id} href={`/projects/${p.id}`} className="card project-card">
             <div className="row">
-              <span className="badge badge-blue">{p.field}</span>
+              <span className="badge badge-blue">{t(p.field)}</span>
               {!isMentor && p.field === currentUser?.careerField && (
-                <span className="badge badge-green">Best match</span>
+                <span className="badge badge-green">{t("Best match")}</span>
               )}
               {!isMentor && matchPercent(currentUser, p.field) != null && (
-                <span className="badge">{matchPercent(currentUser, p.field)}% fit</span>
+                <span className="badge">{t("{percent}% fit", { percent: matchPercent(currentUser, p.field) })}</span>
               )}
-              {isMentor && p.mentorId === currentUser?.id && <span className="badge badge-green">Your project</span>}
+              {isMentor && p.mentorId === currentUser?.id && <span className="badge badge-green">{t("Your project")}</span>}
             </div>
             <h3>{p.title}</h3>
             <p className="desc">{p.description}</p>
             <span className="muted small">
-              {p.company} · {p.difficulty} · teams of {p.teamSize} · {(p.taskTemplates || []).length} tasks
+              {p.company} · {t(p.difficulty)} ·{" "}
+              {t("teams of {n} · {tasks} tasks", { n: p.teamSize, tasks: (p.taskTemplates || []).length })}
             </span>
           </Link>
         ))}

@@ -4,6 +4,7 @@
 import { DIFFICULTIES, FIELDS, MAX_PROJECT_DESCRIPTION_CHARS } from "@/lib/config";
 import { DATA_RULE, askJson, clip, hasAI, rateLimit, readJson, tooManyRequests } from "@/lib/server/ai";
 import { fallbackDraft, normaliseDraft } from "@/lib/projectDraft";
+import { LOCALES, aiLanguage, translator } from "@/lib/i18n";
 
 const SYSTEM_PROMPT = `You help industry mentors turn a realistic workplace scenario into a team project for beginners.
 Write 3 to 5 criteria: each is one industry standard a reviewer can check in the submitted work (name: 2 to 4 words, description: one sentence of what "good" looks like).
@@ -51,7 +52,9 @@ export async function POST(request) {
     field: FIELDS.includes(body.field) ? body.field : FIELDS[0],
     difficulty: DIFFICULTIES.includes(body.difficulty) ? body.difficulty : "beginner",
     description: clip(body.description, MAX_PROJECT_DESCRIPTION_CHARS).trim(),
+    locale: LOCALES.includes(body.locale) ? body.locale : "en",
   };
+  const t = translator(input.locale);
   if (!input.title || input.description.length < 30) {
     return Response.json(
       { error: "Write a title and a scenario of at least a couple of sentences first." },
@@ -59,14 +62,14 @@ export async function POST(request) {
     );
   }
 
-  if (!hasAI()) return Response.json(fallbackDraft(input, "no-key"));
+  if (!hasAI()) return Response.json(fallbackDraft(input, "no-key", t));
 
   const limit = rateLimit(request);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
   try {
     const output = await askJson({
-      system: SYSTEM_PROMPT,
+      system: `${SYSTEM_PROMPT}\n${aiLanguage(input.locale)}`,
       schema: DRAFT_SCHEMA,
       prompt: [
         `Field: ${input.field}`,
@@ -82,6 +85,6 @@ export async function POST(request) {
     return Response.json({ ...draft, simulated: false });
   } catch (error) {
     console.error("AI project draft failed, using template:", error);
-    return Response.json(fallbackDraft(input, "error"));
+    return Response.json(fallbackDraft(input, "error", t));
   }
 }

@@ -7,12 +7,14 @@ import { useCallback, useEffect, useState } from "react";
 import { getCourse } from "@/lib/courses";
 import { addAnalysis, getAnalyses, getContributionsForTeam, getTeamFeedback } from "@/lib/db";
 import { buildCriteriaResults } from "@/lib/progress";
+import { useLocale, useT } from "@/components/LocaleProvider";
 
 function List({ title, items }) {
+  const t = useT();
   if (!items?.length) return null;
   return (
     <div>
-      <div className="eyebrow">{title}</div>
+      <div className="eyebrow">{t(title)}</div>
       <ul className="bullets">
         {items.map((item, i) => (
           <li key={i}>{item}</li>
@@ -23,6 +25,7 @@ function List({ title, items }) {
 }
 
 export default function PersonalAnalysis({ team, project, tasks, currentUser }) {
+  const { t, locale } = useLocale();
   const [latest, setLatest] = useState(undefined);
   const [hasReview, setHasReview] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,6 +61,7 @@ export default function PersonalAnalysis({ team, project, tasks, currentUser }) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          locale,
           project: { title: project.title, field: project.field, description: project.description },
           criteriaResults: results.map((r) => ({
             name: r.name,
@@ -84,7 +88,7 @@ export default function PersonalAnalysis({ team, project, tasks, currentUser }) 
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
+      if (!res.ok) throw new Error(data.error || t("Request failed"));
       await addAnalysis({
         teamId: team.id,
         projectId: project.id,
@@ -109,24 +113,24 @@ export default function PersonalAnalysis({ team, project, tasks, currentUser }) 
     <section className="card" style={{ marginTop: 24 }}>
       <div className="spread">
         <div>
-          <h2>My personal analysis</h2>
+          <h2>{t("My personal analysis")}</h2>
           <p className="muted small">
-            AI turns your feedback and contributions into strengths, next steps and course ideas.
+            {t("AI turns your feedback and contributions into strengths, next steps and course ideas.")}
           </p>
         </div>
         <button className="btn" onClick={generate} disabled={loading || !hasReview}>
-          {loading ? "Analysing…" : latest ? "Refresh analysis" : "Generate my analysis"}
+          {loading ? t("Analysing…") : latest ? t("Refresh analysis") : t("Generate my analysis")}
         </button>
       </div>
 
-      {!hasReview && <p className="muted small">Get AI feedback on at least one task first.</p>}
+      {!hasReview && <p className="muted small">{t("Get AI feedback on at least one task first.")}</p>}
       {error && <p className="error">{error}</p>}
 
       {latest && (
         <div className="stack" style={{ marginTop: 12 }}>
           <div className="row">
-            <span className="badge badge-blue">AI analysis</span>
-            {latest.simulated && <span className="badge badge-amber">Simulated</span>}
+            <span className="badge badge-blue">{t("AI analysis")}</span>
+            {latest.simulated && <span className="badge badge-amber">{t("Simulated")}</span>}
             <span className="muted small">{new Date(latest.createdAt).toLocaleString()}</span>
           </div>
           <p>{latest.summary}</p>
@@ -138,7 +142,7 @@ export default function PersonalAnalysis({ team, project, tasks, currentUser }) 
 
           {latest.courses?.length > 0 && (
             <div>
-              <div className="eyebrow">Suggested courses</div>
+              <div className="eyebrow">{t("Suggested courses")}</div>
               <div className="grid">
                 {latest.courses.map((c) => {
                   const course = getCourse(c.id);
@@ -148,13 +152,13 @@ export default function PersonalAnalysis({ team, project, tasks, currentUser }) 
                       <span className="badge">{course.provider}</span>
                       <strong>{course.title}</strong>
                       <span className="muted small">{c.reason}</span>
-                      <span className="small">Open course ↗</span>
+                      <span className="small">{t("Open course ↗")}</span>
                     </a>
                   );
                 })}
               </div>
               <p className="muted small" style={{ marginTop: 8 }}>
-                Picked from a curated list, so the AI never invents courses.
+                {t("Picked from a curated list, so the AI never invents courses.")}
               </p>
             </div>
           )}

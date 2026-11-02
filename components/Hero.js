@@ -1,5 +1,8 @@
+"use client";
+
 // Home banner: the MAntor wordmark with its four orange rays, then the tagline on navy.
 import { APP_NAME, APP_TAGLINE } from "@/lib/config";
+import { useT } from "./LocaleProvider";
 
 // A four-point spark. Each ray is the same shape, sized and placed by CSS (.ray-*).
 function Ray({ className }) {
@@ -11,6 +14,7 @@ function Ray({ className }) {
 }
 
 export default function Hero() {
+  const t = useT();
   return (
     <section className="hero-banner bleed">
       <div className="hero-top">
@@ -23,7 +27,7 @@ export default function Hero() {
         </h1>
       </div>
       <div className="hero-band">
-        <p>{APP_TAGLINE}</p>
+        <p>{t(APP_TAGLINE)}</p>
       </div>
     </section>
   );

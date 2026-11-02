@@ -8,8 +8,10 @@ import { useToast } from "./Toast";
 import { useUser } from "./UserProvider";
 import { resizeToAvatar } from "@/lib/avatar";
 import { saveAvatar } from "@/lib/db";
+import { useT } from "./LocaleProvider";
 
 export default function PhotoPicker() {
+  const t = useT();
   const toast = useToast();
   const { currentUser, refreshProfile, refreshUsers } = useUser();
   const input = useRef(null);
@@ -23,9 +25,9 @@ export default function PhotoPicker() {
       await saveAvatar(currentUser, photo);
       await refreshProfile();
       if (currentUser.role === "mentor") await refreshUsers();
-      toast(photo ? "Photo updated" : "Photo removed");
+      toast(photo ? t("Photo updated") : t("Photo removed"));
     } catch (e) {
-      setError(e.message || "Could not save the photo");
+      setError(t(e.message || "Could not save the photo"));
     }
     setBusy(false);
   }
@@ -37,7 +39,7 @@ export default function PhotoPicker() {
     try {
       await save(await resizeToAvatar(file));
     } catch (err) {
-      setError(err.message);
+      setError(t(err.message));
     }
   }
 
@@ -47,18 +49,18 @@ export default function PhotoPicker() {
       <div className="stack" style={{ gap: 8 }}>
         <div className="row">
           <button type="button" className="btn btn-secondary btn-small" onClick={() => input.current?.click()} disabled={busy}>
-            {busy ? "Saving…" : currentUser.photo ? "Change photo" : "Upload photo"}
+            {busy ? t("Saving…") : currentUser.photo ? t("Change photo") : t("Upload photo")}
           </button>
           {currentUser.photo && (
             <button type="button" className="btn btn-ghost btn-small" onClick={() => save(null)} disabled={busy}>
-              Remove
+              {t("Remove")}
             </button>
           )}
         </div>
         <span className="muted small">
           {currentUser.role === "mentor"
-            ? "Learners see your photo next to your name."
-            : "Only you, your teammates and mentors you accepted see it. Mentors otherwise see your initials."}
+            ? t("Learners see your photo next to your name.")
+            : t("Only you, your teammates and mentors you accepted see it. Mentors otherwise see your initials.")}
         </span>
         {error && <span className="error small">{error}</span>}
       </div>

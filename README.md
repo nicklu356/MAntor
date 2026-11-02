@@ -11,6 +11,68 @@ Students and career changers need hands-on experience, but online learning rarel
 
 ---
 
+## 📸 Screenshots
+
+| | |
+|---|---|
+| ![Home: the learner's career assessment result](docs/screenshots/home.png) **Home** | ![Career assessment result with every field's fit](docs/screenshots/assessment.png) **Career assessment** |
+| ![Projects ranked by fit](docs/screenshots/projects.png) **Projects, ranked by fit** | ![Team board with deadlines and milestones](docs/screenshots/team-board.png) **Team board, deadlines and milestones** |
+| ![A task with AI feedback on the mentor's criteria](docs/screenshots/task-feedback.png) **AI feedback on the mentor's criteria** | ![The mentor's weekly summary](docs/screenshots/mentor-week.png) **The mentor's week** |
+| ![A learner's portfolio](docs/screenshots/portfolio.png) **Portfolio** | ![The team board in Traditional Chinese](docs/screenshots/chinese.png) **繁體中文** |
+
+Taken from the demo (sample learners and mentors, no AI key, hence the *Simulated* badges). To take them again: build and start the demo without Firebase keys, then `node scripts/screenshots.mjs http://localhost:3000`.
+
+---
+
+## 🏗️ How it fits together
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser (Next.js pages, React)"]
+    UI["Pages and components<br/>EN / 繁體中文"]
+    DB["lib/db.js<br/>every read and write"]
+    Mock[("Demo data<br/>localStorage")]
+  end
+
+  subgraph Vercel["Vercel (Next.js server routes)"]
+    AIR["/api/feedback, coach, analysis,<br/>assessment, project-draft,<br/>mentor-summary"]
+    Notify["/api/notify<br/>emails after an action"]
+    Cron["/api/cron/reminders (daily)<br/>/api/cron/weekly (Mondays)"]
+    Account["/api/account/delete<br/>/p/[id] public portfolio"]
+  end
+
+  subgraph Firebase["Google Firebase"]
+    Auth["Authentication<br/>email, Google"]
+    FS[("Firestore<br/>+ security rules")]
+  end
+
+  Claude["Claude API"]
+  SMTP["Mail server (SMTP)"]
+
+  UI --> DB
+  DB -- "demo" --> Mock
+  DB -- "accounts, live updates" --> FS
+  UI -- "sign in" --> Auth
+  UI -- "AI requests" --> AIR
+  AIR --> Claude
+  AIR -- "verified scores (Admin SDK)" --> FS
+  DB -- "after an action" --> Notify
+  Notify -- "checks the action (Admin SDK)" --> FS
+  Notify --> SMTP
+  Cron --> FS
+  Cron --> Claude
+  Cron --> SMTP
+  Account --> FS
+  Account --> Auth
+```
+
+* **The browser does most of the work.** Pages read and write Firestore directly through `lib/db.js`, and the security rules in `firestore.rules` decide what each signed-in person may do. In the demo, the same functions use the browser's own storage instead
+* **The server keeps the secrets.** The Claude key, the Firebase service account and the mail password exist only in server routes. Things a learner must not be able to fake (AI scores, public portfolios, emails to other people) are done by the server with the Firebase Admin SDK, after checking who is asking
+* **Mentors only see anonymous names**, in the app, in AI prompts and in emails. A learner's real name reaches a mentor only through a connection request the learner accepts
+* **Everything works without keys:** no Firebase key, the demo; no Claude key, simulated AI answers; no mail settings, no emails
+
+---
+
 ## ✅ MVP status
 
 | Feature | Status |
@@ -40,7 +102,13 @@ Students and career changers need hands-on experience, but online learning rarel
 | Profile photos (shrunk in the browser, same privacy as real names) | ✅ Built |
 | Verified AI feedback (scored and saved by the server) and a public portfolio link for CVs | ✅ Built (needs `FIREBASE_SERVICE_ACCOUNT`) |
 | Ad blocker detection with a clear message when it stops Google sign-in | ✅ Built |
+| Privacy policy and terms, "Download my data", "Delete my account" | ✅ Built (deletion needs `FIREBASE_SERVICE_ACCOUNT`) |
+| Live updates: board, discussion, submissions, feedback and team appear for everyone without reloading (also between tabs in the demo) | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
+| Email notifications (comments, help requests, final feedback, connection requests, mentor applications), in each person's language, can be switched off | ✅ Built (needs SMTP settings and `FIREBASE_SERVICE_ACCOUNT`) |
+| Deadlines and milestones: projects last N weeks, each task is due at the end of its week; late badges, a weekly timeline with "on track / behind plan", reminders in the bell, late teams on the mentor's list, and a daily reminder email the day before | ✅ Built (emails need `CRON_SECRET` too) |
+| Mentor's weekly summary: every team's week (progress, deadlines, help requests, weak scores, quiet members) with one 10-minute action each, on the home page and as a Monday email | ✅ Built (Claude API; email needs `CRON_SECRET`) |
+| English and Traditional Chinese (繁體中文): button in the header, Chinese browsers get Chinese automatically, AI answers in the chosen language | ✅ Built |
 
 ### 🔌 What happens without an API key
 
@@ -51,19 +119,29 @@ The app **never breaks without a key**. With no `ANTHROPIC_API_KEY` (or if the A
 ## 🧪 Tests
 
 ```bash
-npm test         # unit tests for the logic in lib/
-npm run build    # production build
+npm test                  # unit tests for the logic in lib/ (fast, no setup)
+npm run test:e2e          # end-to-end tests of the demo in a real browser (Playwright)
+npm run test:rules        # Firestore security rules against the Firebase emulators
+npm run test:e2e:firebase # end-to-end tests with real accounts, against the emulators
+npm run build             # production build
 ```
 
-GitHub Actions runs both on every push to `main` and on every pull request.
+* The end-to-end tests build the app into their own folder and switch off any Firebase or AI keys from `.env.local`, so they never touch real data or spend money
+* `test:rules` and `test:e2e:firebase` need the [Firebase CLI](https://firebase.google.com/docs/cli) (`npm install -g firebase-tools`) and Java 11+ for the Firestore emulator. No Firebase project is needed
+* The first time, install the test browser with `npx playwright install chromium`
+
+GitHub Actions runs all of them on every push to `main` and on every pull request (see `.github/workflows/ci.yml`).
 
 ---
 
 ## 🛠️ Tech stack
 
-* **Frontend and backend:** Next.js (React)
-* **Database:** Firebase Firestore
-* **AI:** Claude API
+* **Frontend and backend:** Next.js (React), server routes for AI, email and scheduled jobs
+* **Database and accounts:** Firebase Firestore (live updates, security rules) and Firebase Authentication
+* **AI:** Claude API (structured outputs)
+* **Email:** any SMTP server (for example Gmail), Vercel Cron for reminders
+* **Languages:** English and Traditional Chinese
+* **Tests:** Node's test runner, Playwright, Firebase emulators, GitHub Actions
 * **Design:** Figma
 * **Deployment:** Vercel
 * **Collaboration:** GitHub
@@ -162,6 +240,30 @@ Two features need the server to use Firebase with full access: **verified AI fee
 
 Without it the app still works: feedback is saved by the browser (shown without the ✓ Verified badge) and public portfolio links say “unavailable”.
 
+**5. Email notifications (optional)**
+
+With email set up, people get an email when something needs them: a teammate comments, a team asks its mentor for help, the mentor gives final feedback, a mentor would like to know who a learner is, someone applies to be a mentor (to admins), and the admin's decision (to the applicant). Each email is written in the language the person uses on the site, and everyone can switch emails off on their Account page.
+
+1. Make an app password for the Gmail account that will send the emails: **Google Account > Security > 2-Step Verification > App passwords** (2-Step Verification must be on). Any other mail service with SMTP works too (Resend, SendGrid, Mailgun, your school's server)
+2. Vercel > **Settings > Environment Variables** (Production and Preview), server only, **never** with `NEXT_PUBLIC_`:
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_USER=the Gmail address
+SMTP_PASS=the 16-letter app password
+MAIL_FROM=MAntor <the Gmail address>
+SITE_URL=https://your-app.vercel.app
+```
+
+3. Redeploy. It also needs `FIREBASE_SERVICE_ACCOUNT` (step 4): the server checks every action really happened before emailing anyone, so nobody can use it to send email of their own
+
+**Mentor's Monday email:** `/api/cron/weekly` (Sunday 21:00 UTC, Monday 8 am in Melbourne) emails each mentor the same summary as the **Your week** card on their home page. It uses the same `CRON_SECRET`.
+
+**Deadline reminders:** a daily job (`/api/cron/reminders`, scheduled in `vercel.json` for 21:00 UTC, which is 8 am in Melbourne) emails each team the day before tasks are due. Add `CRON_SECRET` (any long random text) to Vercel's environment variables: Vercel sends it with every scheduled run, and the job refuses calls without it. `REMINDER_TIME_ZONE` (default `Australia/Melbourne`) decides what "tomorrow" means.
+
+Emails only go to **verified** addresses (Google accounts are verified; email accounts once the person clicks the verification link). Mentors see learners by anonymous name in email too. To try it without sending anything, set `MAIL_OUTBOX=mail.jsonl`: each email is written to that file instead. Gmail allows about 500 emails a day, plenty for a pilot.
+
 **What stays private:** a learner's real name and email are in `profiles/{uid}` (only they can read it). Teammates see each other's names through `teamNames/{teamId}` (members only). Mentors see anonymous names until a learner accepts their connection request.
 
 **Photos:** profile photos are shrunk to 256 × 256 in the browser and stored in Firestore (no Firebase Storage or paid plan needed). Like real names, a learner's photo is only visible to them, their teammates, mentors they accepted, and their public portfolio if they publish it.
@@ -205,7 +307,7 @@ Anonymous names: Mia = `Learner #A3F`, Liam = `Learner #B71`, Sofia = `Learner #
 ```
 app/
   page.js                          Home: learner (result + teams) or mentor (projects + teams)
-  assessment/page.js               Career assessment (6 questions)
+  assessment/page.js               Career assessment (32 activities)
   projects/page.js                 Browse projects
   projects/[id]/page.js            Project brief, mentor criteria, Join
   projects/new/page.js             Mentor: publish a new project
@@ -214,7 +316,9 @@ app/
   teams/[id]/page.js               Task board, progress, personal analysis, mentor final feedback
   teams/[id]/tasks/[taskId]/page.js  Task: submission, contributions, AI feedback, discussion
   setup/page.js                    Check the database connection / reset the demo data
-  login, signup, account           Sign in (email or Google), sign up, your account and mentor application
+  login, signup, account           Sign in (email or Google), sign up, your account, mentor application, your data
+  privacy/page.js                  Privacy policy and terms
+  api/account/delete/route.js      Deletes an account and the data that belongs to it (server)
   admin/page.js                    Admin: approve mentors, load sample projects, remove old demo records
   p/[id]/page.js                   Public portfolio (no login; built on the server)
   api/feedback/route.js            AI task feedback (server, keeps the key secret)
@@ -223,6 +327,10 @@ app/
   api/coach/route.js               AI coach chat on a task (hints only)
   api/project-draft/route.js       AI draft of criteria and tasks for a mentor's project
   api/status/route.js              Tells the header if AI is live or simulated
+  api/notify/route.js              Email notifications: checks the action, emails the people it concerns
+  api/cron/reminders/route.js      Daily email: tasks due tomorrow (run by Vercel Cron)
+  api/mentor-summary/route.js      AI "Your week" summary for mentors
+  api/cron/weekly/route.js         Monday email: each mentor's week
 components/
   Header.js                        Menu, AI/mode badges, "Viewing as" switch (learners and mentors)
   UserProvider.js                  Who is using the app (demo switch or signed-in account); userName() decides which name each viewer may see
@@ -243,6 +351,9 @@ components/
   ConnectionRequests.js            Learner accepts or declines mentor requests
   NotificationBell.js              Bell in the header
   Hero.js, Toast.js                Home banner; small confirmation messages
+  Deadline.js                      Due badges, the editable due date, the milestones timeline
+  WeeklySummary.js                 Mentor home: "Your week" card
+  LocaleProvider.js                The chosen language: useT() gives components the translator
 lib/
   db.js                            Every read and write (Firebase or demo mode)
   seed.js                          Demo users, projects, team, tasks, example feedback, comments
@@ -259,9 +370,21 @@ lib/
   profile.js, avatar.js, adblock.js  Profile checks, photo shrinking, ad blocker detection
   server/firebaseAdmin.js          Server access to Firebase (verified feedback, public portfolios)
   server/portfolio.js              Builds the public portfolio
+  server/mail.js, server/notifyEvents.js  Sending email (SMTP or a test file); who hears about what
+  server/deliver.js                Emails a list of people (verified, opted in, in their language)
+  schedule.js                      Deadlines: project weeks, due dates, late/soon, milestones
+  weeklySummary.js                 A mentor's week as facts (anonymous names), and a summary without AI
+  server/mentorSummary.js          Claude writes the weekly summary from those facts
+  notify.js                        Browser side: asks the server to email after an action
   session.js                       Demo or real accounts
+  live.js                          useLiveList / useLiveDoc hooks (live updates)
   firebase.js, mockStore.js, config.js
+  i18n/index.js                    translate(), language choice (cookie, then browser language)
+  i18n/zh-TW.js                    Traditional Chinese text, keyed by the English original
+  i18n/server.js                   getT() for server pages (about, privacy, public portfolio)
 tests/                             Unit tests for lib/ (npm test)
+e2e/                               Browser tests: demo.spec.mjs (demo), accounts.spec.mjs (accounts, emulators)
+tests/rules/                       Firestore security rules tests (emulators)
 docs/
   execution-plan.md                Problem, user flow, design decisions, MVP
   data-structure.md                Firestore collections and fields
@@ -270,6 +393,7 @@ docs/
 ### Common changes
 
 * **App name:** `lib/config.js`
+* **Text and translations:** write English in the code inside `t("...")` (`const t = useT()` in components, `await getT()` in server pages), then add the same text with its Chinese version to `lib/i18n/zh-TW.js`. Text without a translation falls back to English, and `npm test` lists any `t("...")` text that is missing from the dictionary. Use `{name}` placeholders instead of joining strings, so the word order can change in Chinese. Content people write (projects, submissions, comments) is shown as written
 * **Colours and fonts (to match Figma):** the variables at the top of `app/globals.css`
 * **Projects, criteria, demo learners:** `lib/seed.js` (then reset demo data, or reload it into Firebase at `/setup`)
 * **How the AI gives feedback:** `SYSTEM_PROMPT` in `app/api/feedback/route.js` (the coach and project draft have their own prompts in `app/api/coach` and `app/api/project-draft`)

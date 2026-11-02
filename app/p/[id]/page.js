@@ -6,6 +6,7 @@ import { ScoreDots } from "@/components/FeedbackPanel";
 import { APP_NAME } from "@/lib/config";
 import { hasAdmin } from "@/lib/server/firebaseAdmin";
 import { getPublicPortfolio } from "@/lib/server/portfolio";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,25 +22,30 @@ async function load(id) {
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
+  const t = await getT();
   const { portfolio } = await load(id);
-  if (!portfolio) return { title: "Portfolio" };
+  if (!portfolio) return { title: t("Portfolio") };
   return {
-    title: `${portfolio.name} · Portfolio`,
-    description: `${portfolio.name}'s project experience on ${APP_NAME}: realistic workplace projects reviewed against industry mentors' standards.`,
+    title: `${portfolio.name} · ${t("Portfolio")}`,
+    description: t("{name}'s project experience on {app}: realistic workplace projects reviewed against industry mentors' standards.", {
+      name: portfolio.name,
+      app: APP_NAME,
+    }),
   };
 }
 
 export default async function PublicPortfolioPage({ params }) {
   const { id } = await params;
+  const t = await getT();
   const { portfolio, off, failed } = await load(id);
   if (off || failed) {
     return (
       <div className="card" style={{ maxWidth: 560 }}>
-        <h1>Portfolio unavailable</h1>
+        <h1>{t("Portfolio unavailable")}</h1>
         <p className="muted">
           {off
-            ? "Public portfolios are not switched on for this site yet (the server needs FIREBASE_SERVICE_ACCOUNT, see README)."
-            : "This portfolio could not be loaded. Please try again later."}
+            ? t("Public portfolios are not switched on for this site yet (the server needs FIREBASE_SERVICE_ACCOUNT, see README).")
+            : t("This portfolio could not be loaded. Please try again later.")}
         </p>
       </div>
     );
@@ -58,55 +64,58 @@ export default async function PublicPortfolioPage({ params }) {
             {portfolio.photo ? <img src={portfolio.photo} alt="" /> : portfolio.name.slice(0, 1)}
           </span>
           <div>
-            <div className="eyebrow">Project portfolio · {APP_NAME}</div>
+            <div className="eyebrow">
+              {t("Project portfolio")} · {APP_NAME}
+            </div>
             <h1>{portfolio.name}</h1>
             {portfolio.education && (
               <p className="muted">
-                {portfolio.education.level}, {portfolio.education.field} · {portfolio.education.school}
+                {t(portfolio.education.level)}, {portfolio.education.field} · {portfolio.education.school}
                 {portfolio.education.year ? ` (${portfolio.education.year})` : ""}
               </p>
             )}
-            {portfolio.careerField && <p className="muted small">Building experience in {portfolio.careerField}</p>}
+            {portfolio.careerField && <p className="muted small">{t("Building experience in {field}", { field: t(portfolio.careerField) })}</p>}
           </div>
         </div>
         <div className="stats">
           <div className="stat">
             <div className="stat-value">{portfolio.projects.length}</div>
-            <div className="muted small">Team projects</div>
+            <div className="muted small">{t("Team projects")}</div>
           </div>
           <div className="stat">
             <div className="stat-value">{completed}</div>
-            <div className="muted small">Completed with mentor review</div>
+            <div className="muted small">{t("Completed with mentor review")}</div>
           </div>
           <div className="stat">
             <div className="stat-value">{hours}h</div>
-            <div className="muted small">Recorded contribution</div>
+            <div className="muted small">{t("Recorded contribution")}</div>
           </div>
         </div>
       </section>
 
-      {portfolio.projects.length === 0 && <p className="card muted">No projects yet.</p>}
+      {portfolio.projects.length === 0 && <p className="card muted">{t("No projects yet.")}</p>}
 
       {portfolio.projects.map((p) => (
         <section key={p.id} className="card stack">
           <div>
             <div className="row">
-              <span className="badge badge-blue">{p.field}</span>
+              <span className="badge badge-blue">{t(p.field)}</span>
               {p.status === "completed" ? (
-                <span className="badge badge-green">✓ Completed · reviewed by mentor</span>
+                <span className="badge badge-green">{t("✓ Completed · reviewed by mentor")}</span>
               ) : (
-                <span className="badge">In progress</span>
+                <span className="badge">{t("In progress")}</span>
               )}
             </div>
             <h2 style={{ marginTop: 8 }}>{p.title}</h2>
             <div className="muted small">
-              Scenario by {p.company} · team of {p.teamSize} · {p.tasksDone} of {p.tasksTotal} tasks done
+              {t("Scenario by {company} · team of {n}", { company: p.company, n: p.teamSize })} ·{" "}
+              {t("{done} of {total} tasks done", { done: p.tasksDone, total: p.tasksTotal })}
             </div>
           </div>
 
           {p.mentorFeedback && (
             <div>
-              <div className="eyebrow">Mentor&apos;s final feedback</div>
+              <div className="eyebrow">{t("Mentor's final feedback")}</div>
               <blockquote className="quote">{p.mentorFeedback.summary}</blockquote>
               <div className="muted small">
                 {p.mentorFeedback.mentorName}, {p.mentorFeedback.company}
@@ -116,9 +125,9 @@ export default async function PublicPortfolioPage({ params }) {
 
           <div className="analysis-grid">
             <div>
-              <div className="eyebrow">Verified results against the mentor&apos;s criteria</div>
+              <div className="eyebrow">{t("Verified results against the mentor's criteria")}</div>
               {p.results.length === 0 ? (
-                <p className="muted small">No verified reviews yet.</p>
+                <p className="muted small">{t("No verified reviews yet.")}</p>
               ) : (
                 p.results.map((r) => (
                   <div key={r.key} className="score-row">
@@ -132,9 +141,9 @@ export default async function PublicPortfolioPage({ params }) {
               )}
             </div>
             <div>
-              <div className="eyebrow">What they did (self-reported)</div>
+              <div className="eyebrow">{t("What they did (self-reported)")}</div>
               {p.contributions.length === 0 ? (
-                <p className="muted small">No contributions recorded.</p>
+                <p className="muted small">{t("No contributions recorded.")}</p>
               ) : (
                 <ul className="bullets">
                   {p.contributions.map((c) => (
@@ -153,9 +162,11 @@ export default async function PublicPortfolioPage({ params }) {
       ))}
 
       <p className="muted small">
-        Scores are AI reviews saved by the {APP_NAME} server against criteria written by industry mentors; final
-        feedback is written by the mentor. Projects are realistic scenarios, not client work.{" "}
-        <Link href="/about">About {APP_NAME}</Link>
+        {t(
+          "Scores are AI reviews saved by the {app} server against criteria written by industry mentors; final feedback is written by the mentor. Projects are realistic scenarios, not client work.",
+          { app: APP_NAME }
+        )}{" "}
+        <Link href="/about">{t("About {app}", { app: APP_NAME })}</Link>
       </p>
     </div>
   );

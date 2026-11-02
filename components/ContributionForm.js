@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { addContribution } from "@/lib/db";
+import { useT } from "@/components/LocaleProvider";
 
 export default function ContributionForm({ taskId, teamId, userId, onAdded }) {
+  const t = useT();
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("1");
   const [saving, setSaving] = useState(false);
@@ -22,16 +24,16 @@ export default function ContributionForm({ taskId, teamId, userId, onAdded }) {
   return (
     <form onSubmit={handleSubmit} className="stack" style={{ marginTop: 16 }}>
       <label className="field">
-        What did you do?
+        {t("What did you do?")}
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g. Ran 2 interviews and wrote the summary"
+          placeholder={t("e.g. Ran 2 interviews and wrote the summary")}
           style={{ minHeight: 80 }}
         />
       </label>
       <label className="field">
-        Hours spent
+        {t("Hours spent")}
         <input
           type="number"
           min="0"
@@ -42,7 +44,7 @@ export default function ContributionForm({ taskId, teamId, userId, onAdded }) {
       </label>
       <div>
         <button className="btn btn-secondary" disabled={saving || !description.trim()}>
-          {saving ? "Saving…" : "Add contribution"}
+          {saving ? t("Saving…") : t("Add contribution")}
         </button>
       </div>
     </form>

@@ -6,6 +6,8 @@
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { DIFFICULTIES, FIELDS, MAX_PROJECT_DESCRIPTION_CHARS, MAX_TEAM_SIZE, MIN_TEAM_SIZE } from "@/lib/config";
+import { useLocale } from "@/components/LocaleProvider";
+import { DEFAULT_WEEKS, MAX_WEEKS, MIN_WEEKS, clampWeeks, templateWeeks } from "@/lib/schedule";
 
 const emptyCriterion = () => ({ name: "", description: "" });
 const emptyTask = () => ({ title: "", description: "", criteriaIndexes: [0] });
@@ -17,12 +19,14 @@ export function projectToForm(project) {
     field: project.field,
     difficulty: project.difficulty,
     teamSize: project.teamSize,
+    durationWeeks: clampWeeks(project.durationWeeks),
     description: project.description,
     criteria: project.criteria.map((c) => ({ ...c })),
-    taskTemplates: (project.taskTemplates || []).map((t) => ({
-      title: t.title,
-      description: t.description,
-      criteriaIndexes: t.criteriaIds.map((id) => project.criteria.findIndex((c) => c.id === id)).filter((i) => i >= 0),
+    taskTemplates: (project.taskTemplates || []).map((item) => ({
+      title: item.title,
+      description: item.description,
+      criteriaIndexes: item.criteriaIds.map((id) => project.criteria.findIndex((c) => c.id === id)).filter((i) => i >= 0),
+      week: item.week,
     })),
   };
 }
@@ -32,6 +36,7 @@ export const emptyProjectForm = () => ({
   field: FIELDS[0],
   difficulty: "beginner",
   teamSize: 3,
+  durationWeeks: DEFAULT_WEEKS,
   description: "",
   criteria: [emptyCriterion()],
   taskTemplates: [emptyTask()],
@@ -42,32 +47,35 @@ export function validateProject(form) {
   if (form.description.trim().length < 30) return "Describe the workplace scenario in a few sentences.";
   if (!form.criteria.length || form.criteria.some((c) => !c.name.trim() || !c.description.trim()))
     return "Every criterion needs a name and a description.";
-  if (!form.taskTemplates.length || form.taskTemplates.some((t) => !t.title.trim() || !t.description.trim()))
+  if (!form.taskTemplates.length || form.taskTemplates.some((item) => !item.title.trim() || !item.description.trim()))
     return "Every task needs a title and instructions.";
-  if (form.taskTemplates.some((t) => !t.criteriaIndexes.length)) return "Every task must be judged on at least one criterion.";
+  if (form.taskTemplates.some((item) => !item.criteriaIndexes.length)) return "Every task must be judged on at least one criterion.";
   return "";
 }
 
 export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }) {
+  const { t, locale } = useLocale();
   const toast = useToast();
   const [form, setForm] = useState(initial);
   const [drafting, setDrafting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Each task's week: the mentor's choice, or spread evenly over the project's length.
+  const weeks = templateWeeks(form.taskTemplates, form.durationWeeks);
 
   const set = (changes) => setForm((f) => ({ ...f, ...changes }));
   const setCriterion = (i, changes) =>
     set({ criteria: form.criteria.map((c, j) => (j === i ? { ...c, ...changes } : c)) });
   const setTask = (i, changes) =>
-    set({ taskTemplates: form.taskTemplates.map((t, j) => (j === i ? { ...t, ...changes } : t)) });
+    set({ taskTemplates: form.taskTemplates.map((item, j) => (j === i ? { ...item, ...changes } : item)) });
 
   function removeCriterion(i) {
     // Shift task references so they keep pointing at the same criteria.
     set({
       criteria: form.criteria.filter((_, j) => j !== i),
-      taskTemplates: form.taskTemplates.map((t) => ({
-        ...t,
-        criteriaIndexes: t.criteriaIndexes.filter((k) => k !== i).map((k) => (k > i ? k - 1 : k)),
+      taskTemplates: form.taskTemplates.map((item) => ({
+        ...item,
+        criteriaIndexes: item.criteriaIndexes.filter((k) => k !== i).map((k) => (k > i ? k - 1 : k)),
       })),
     });
   }
@@ -92,12 +100,13 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
           field: form.field,
           difficulty: form.difficulty,
           description: form.description,
+          locale,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not draft the project");
+      if (!res.ok) throw new Error(data.error || t("Could not draft the project"));
       set({ criteria: data.criteria, taskTemplates: data.tasks });
-      toast(data.simulated ? data.note || "Template draft added" : "AI draft added. Review and edit it before publishing.");
+      toast(data.simulated ? t(data.note || "Template draft added") : t("AI draft added. Review and edit it before publishing."));
     } catch (e) {
       setError(e.message);
     }
@@ -107,13 +116,13 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
   async function handleSubmit(e) {
     e.preventDefault();
     const problem = validateProject(form);
-    if (problem) return setError(problem);
+    if (problem) return setError(t(problem));
     setSaving(true);
     setError("");
     try {
       await onSubmit(form);
     } catch (err) {
-      setError(err.message || "Could not save the project");
+      setError(err.message || t("Could not save the project"));
       setSaving(false);
     }
   }
@@ -123,51 +132,77 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
   return (
     <form onSubmit={handleSubmit} className="stack">
       <section className="card stack">
-        <h2>1. The scenario</h2>
+        <h2>{t("1. The scenario")}</h2>
         <label className="field">
-          Project title
+          {t("Project title")}
           <input
             value={form.title}
             onChange={(e) => set({ title: e.target.value })}
             maxLength={120}
-            placeholder="e.g. Reduce checkout drop-off for a food delivery app"
+            placeholder={t("e.g. Reduce checkout drop-off for a food delivery app")}
           />
         </label>
         <div className="form-row">
           <label className="field">
-            Field
+            {t("Field")}
             <select value={form.field} onChange={(e) => set({ field: e.target.value })}>
               {FIELDS.map((f) => (
-                <option key={f}>{f}</option>
+                <option key={f} value={f}>
+                  {t(f)}
+                </option>
               ))}
             </select>
           </label>
           <label className="field">
-            Difficulty
+            {t("Difficulty")}
             <select value={form.difficulty} onChange={(e) => set({ difficulty: e.target.value })}>
               {DIFFICULTIES.map((d) => (
-                <option key={d}>{d}</option>
+                <option key={d} value={d}>
+                  {t(d)}
+                </option>
               ))}
             </select>
           </label>
           <label className="field">
-            Team size
+            {t("Team size")}
             <select value={form.teamSize} onChange={(e) => set({ teamSize: Number(e.target.value) })}>
               {Array.from({ length: MAX_TEAM_SIZE - MIN_TEAM_SIZE + 1 }, (_, i) => MIN_TEAM_SIZE + i).map((n) => (
                 <option key={n} value={n}>
-                  {n} learners
+                  {t("{n} learners", { n })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            {t("Length")}
+            <select
+              value={clampWeeks(form.durationWeeks)}
+              onChange={(e) => {
+                const weeks = Number(e.target.value);
+                // Keep each task's week inside the new length.
+                set({
+                  durationWeeks: weeks,
+                  taskTemplates: form.taskTemplates.map((item) => (item.week > weeks ? { ...item, week: weeks } : item)),
+                });
+              }}
+            >
+              {Array.from({ length: MAX_WEEKS - MIN_WEEKS + 1 }, (_, i) => MIN_WEEKS + i).map((n) => (
+                <option key={n} value={n}>
+                  {t(n === 1 ? "{n} week" : "{n} weeks", { n })}
                 </option>
               ))}
             </select>
           </label>
         </div>
         <label className="field">
-          Workplace scenario
+          {t("Workplace scenario")}
           <textarea
             value={form.description}
             onChange={(e) => set({ description: e.target.value })}
             maxLength={MAX_PROJECT_DESCRIPTION_CHARS}
-            placeholder="Describe a realistic situation from your work, without confidential details. What is the problem, who is affected, and what should the team deliver?"
+            placeholder={t(
+              "Describe a realistic situation from your work, without confidential details. What is the problem, who is affected, and what should the team deliver?"
+            )}
           />
           <span className="muted small">
             {form.description.length} / {MAX_PROJECT_DESCRIPTION_CHARS}
@@ -175,46 +210,46 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
         </label>
         <div className="row">
           <button type="button" className="btn btn-secondary" onClick={draftWithAI} disabled={!canDraft || drafting}>
-            {drafting ? "Drafting…" : "✦ Draft criteria and tasks with AI"}
+            {drafting ? t("Drafting…") : t("✦ Draft criteria and tasks with AI")}
           </button>
           <span className="muted small">
-            {canDraft ? "Replaces the criteria and tasks below." : "Write a title and scenario first."}
+            {canDraft ? t("Replaces the criteria and tasks below.") : t("Write a title and scenario first.")}
           </span>
         </div>
       </section>
 
       <section className="card stack">
         <div>
-          <h2>2. Criteria</h2>
+          <h2>{t("2. Criteria")}</h2>
           <p className="muted small">
-            The standard you would hold a junior colleague to. AI feedback scores every submission against these.
+            {t("The standard you would hold a junior colleague to. AI feedback scores every submission against these.")}
           </p>
         </div>
         {form.criteria.map((c, i) => (
           <div key={i} className="editor-item">
             <div className="spread">
-              <strong>Criterion {i + 1}</strong>
+              <strong>{t("Criterion {n}", { n: i + 1 })}</strong>
               <button
                 type="button"
                 className="btn btn-ghost btn-small"
                 onClick={() => removeCriterion(i)}
                 disabled={form.criteria.length === 1}
               >
-                Remove
+                {t("Remove")}
               </button>
             </div>
             <input
               value={c.name}
               onChange={(e) => setCriterion(i, { name: e.target.value })}
               maxLength={80}
-              placeholder="Name, e.g. User research"
+              placeholder={t("Name, e.g. User research")}
               aria-label={`Criterion ${i + 1} name`}
             />
             <input
               value={c.description}
               onChange={(e) => setCriterion(i, { description: e.target.value })}
               maxLength={300}
-              placeholder="What good looks like, e.g. Interviews at least 3 users and summarises their needs"
+              placeholder={t("What good looks like, e.g. Interviews at least 3 users and summarises their needs")}
               aria-label={`Criterion ${i + 1} description`}
             />
           </div>
@@ -226,25 +261,39 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
             onClick={() => set({ criteria: [...form.criteria, emptyCriterion()] })}
             disabled={form.criteria.length >= 8}
           >
-            + Add criterion
+            {t("+ Add criterion")}
           </button>
         </div>
       </section>
 
       <section className="card stack">
         <div>
-          <h2>3. Tasks</h2>
+          <h2>{t("3. Tasks")}</h2>
           <p className="muted small">
-            Every new team gets these tasks on its board, in this order.
-            {hasTeams && " Teams that already started keep the tasks they were given."}
+            {t("Every new team gets these tasks on its board, in this order.")}
+            {hasTeams && ` ${t("Teams that already started keep the tasks they were given.")}`}
           </p>
         </div>
-        {form.taskTemplates.map((t, i) => (
+        {form.taskTemplates.map((item, i) => (
           <div key={i} className="editor-item">
             <div className="spread">
-              <strong>Task {i + 1}</strong>
               <span className="row">
-                <button type="button" className="btn btn-ghost btn-small" onClick={() => moveTask(i, -1)} disabled={i === 0} aria-label="Move up">
+                <strong>{t("Task {n}", { n: i + 1 })}</strong>
+                <select
+                  className="select-small"
+                  value={weeks[i]}
+                  onChange={(e) => setTask(i, { week: Number(e.target.value) })}
+                  aria-label={t("Task {n} due in week", { n: i + 1 })}
+                >
+                  {Array.from({ length: clampWeeks(form.durationWeeks) }, (_, w) => w + 1).map((w) => (
+                    <option key={w} value={w}>
+                      {t("Due end of week {n}", { n: w })}
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <span className="row">
+                <button type="button" className="btn btn-ghost btn-small" onClick={() => moveTask(i, -1)} disabled={i === 0} aria-label={t("Move up")}>
                   ↑
                 </button>
                 <button
@@ -252,7 +301,7 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
                   className="btn btn-ghost btn-small"
                   onClick={() => moveTask(i, 1)}
                   disabled={i === form.taskTemplates.length - 1}
-                  aria-label="Move down"
+                  aria-label={t("Move down")}
                 >
                   ↓
                 </button>
@@ -262,41 +311,41 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
                   onClick={() => set({ taskTemplates: form.taskTemplates.filter((_, j) => j !== i) })}
                   disabled={form.taskTemplates.length === 1}
                 >
-                  Remove
+                  {t("Remove")}
                 </button>
               </span>
             </div>
             <input
-              value={t.title}
+              value={item.title}
               onChange={(e) => setTask(i, { title: e.target.value })}
               maxLength={120}
-              placeholder="Title, e.g. Interview 3 users"
+              placeholder={t("Title, e.g. Interview 3 users")}
               aria-label={`Task ${i + 1} title`}
             />
             <textarea
-              value={t.description}
+              value={item.description}
               onChange={(e) => setTask(i, { description: e.target.value })}
               maxLength={500}
               style={{ minHeight: 70 }}
-              placeholder="Instructions a beginner can act on"
+              placeholder={t("Instructions a beginner can act on")}
               aria-label={`Task ${i + 1} instructions`}
             />
             <div className="row small">
-              <span className="muted">Judged on:</span>
+              <span className="muted">{t("Judged on:")}</span>
               {form.criteria.map((c, k) => (
                 <label key={k} className="check">
                   <input
                     type="checkbox"
-                    checked={t.criteriaIndexes.includes(k)}
+                    checked={item.criteriaIndexes.includes(k)}
                     onChange={(e) =>
                       setTask(i, {
                         criteriaIndexes: e.target.checked
-                          ? [...t.criteriaIndexes, k].sort((a, b) => a - b)
-                          : t.criteriaIndexes.filter((x) => x !== k),
+                          ? [...item.criteriaIndexes, k].sort((a, b) => a - b)
+                          : item.criteriaIndexes.filter((x) => x !== k),
                       })
                     }
                   />
-                  {c.name || `Criterion ${k + 1}`}
+                  {c.name || t("Criterion {n}", { n: k + 1 })}
                 </label>
               ))}
             </div>
@@ -309,7 +358,7 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
             onClick={() => set({ taskTemplates: [...form.taskTemplates, emptyTask()] })}
             disabled={form.taskTemplates.length >= 10}
           >
-            + Add task
+            {t("+ Add task")}
           </button>
         </div>
       </section>
@@ -317,7 +366,7 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button className="btn" disabled={saving}>
-          {saving ? "Saving…" : submitLabel}
+          {saving ? t("Saving…") : submitLabel}
         </button>
       </div>
     </form>

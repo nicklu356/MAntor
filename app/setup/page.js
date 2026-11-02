@@ -15,9 +15,14 @@ export default function SetupPage() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState(null); // { ok, text }
   const [host, setHost] = useState("");
+  const [server, setServer] = useState(null); // /api/status: missing settings, running version
 
   useEffect(() => {
     setHost(window.location.hostname);
+    fetch("/api/status")
+      .then((res) => res.json())
+      .then(setServer)
+      .catch(() => {});
   }, []);
 
   async function checkConnection() {
@@ -83,6 +88,26 @@ export default function SetupPage() {
           </button>
         </div>
       </div>
+      {server && (
+        <section className="stack">
+          <h2>{t("Server settings")}</h2>
+          <p className="small">
+            {t("Running version: {version}", { version: server.version })} ·{" "}
+            {server.missing?.length ? (
+              <>
+                {t("The server cannot see:")}{" "}
+                {server.missing.map((name) => (
+                  <code key={name} style={{ marginRight: 6 }}>
+                    {name}
+                  </code>
+                ))}
+              </>
+            ) : (
+              t("All optional server settings are set.")
+            )}
+          </p>
+        </section>
+      )}
       <section className="stack">
         <h2>{t("Firebase settings in this deployment")}</h2>
         <ul className="list-plain small">

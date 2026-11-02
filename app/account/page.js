@@ -347,8 +347,10 @@ function EmailSettings() {
   useEffect(() => {
     fetch("/api/status")
       .then((res) => res.json())
-      .then((data) => setMailStatus({ mail: Boolean(data.mail), admin: Boolean(data.admin) }))
-      .catch(() => setMailStatus({ mail: false, admin: false }));
+      .then((data) =>
+        setMailStatus({ mail: Boolean(data.mail), admin: Boolean(data.admin), missing: data.missing || [], version: data.version })
+      )
+      .catch(() => setMailStatus({ mail: false, admin: false, missing: [] }));
   }, []);
 
   async function toggle() {
@@ -366,11 +368,11 @@ function EmailSettings() {
   return (
     <section className="card stack">
       <h2>{t("Email notifications")}</h2>
-      <label className="row" style={{ alignItems: "flex-start", gap: 10 }}>
-        <input type="checkbox" checked={on} disabled={busy} onChange={toggle} style={{ marginTop: 4 }} />
+      <label className="toggle-row">
+        <input type="checkbox" checked={on} disabled={busy} onChange={toggle} />
         <span>
-          {t("Email me when something needs me")}
-          <span className="muted small" style={{ display: "block" }}>
+          <strong>{t("Email me when something needs me")}</strong>
+          <span className="muted small" style={{ display: "block", marginTop: 2 }}>
             {currentUser.role === "mentor"
               ? t("A team asks for your help, or someone in a team comments.")
               : t("A teammate comments, your mentor gives final feedback, or a mentor would like to know who you are.")}
@@ -390,10 +392,26 @@ function EmailSettings() {
       {mailStatus && !(mailStatus.mail && mailStatus.admin) && (
         <p className="muted small">
           {t("Email is not set up on this site yet, so nothing is sent for now.")}
-          {/* Admins see what is missing, so they can fix it in Vercel. */}
-          {currentUser.admin && !mailStatus.mail && ` ${t("Missing on the server: SMTP_HOST, SMTP_USER or SMTP_PASS (then redeploy).")}`}
-          {currentUser.admin && !mailStatus.admin && ` ${t("Missing on the server: FIREBASE_SERVICE_ACCOUNT (then redeploy).")}`}
         </p>
+      )}
+      {/* Admins see exactly which server settings are missing, so they can fix it in Vercel. */}
+      {currentUser.admin && mailStatus && !(mailStatus.mail && mailStatus.admin) && (
+        <div className="status status-error small">
+          <strong>{t("The server cannot see:")}</strong>{" "}
+          {mailStatus.missing
+            .filter((name) => name !== "CRON_SECRET")
+            .map((name) => (
+              <code key={name} style={{ marginRight: 6 }}>
+                {name}
+              </code>
+            ))}
+          <div style={{ marginTop: 6 }}>
+            {t(
+              "Check the names are spelled exactly like this and ticked for Production in Vercel > Settings > Environment Variables. Then redeploy: settings only reach deployments made after you saved them."
+            )}{" "}
+            {t("Running version: {version}", { version: mailStatus.version || "?" })}
+          </div>
+        </div>
       )}
     </section>
   );

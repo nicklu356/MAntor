@@ -19,10 +19,13 @@ export default function SetupPage() {
 
   useEffect(() => {
     setHost(window.location.hostname);
-    fetch("/api/status")
-      .then((res) => res.json())
+    fetch("/api/status", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(setServer)
-      .catch(() => {});
+      .catch((e) => setServer({ failed: e.message || "network error" }));
   }, []);
 
   async function checkConnection() {
@@ -91,7 +94,19 @@ export default function SetupPage() {
       {server && (
         <section className="stack">
           <h2>{t("Server settings")}</h2>
-          <p className="small">
+          {server.failed && (
+            <p className="status status-error small">
+              {t("Could not check the server's email settings ({error}). Open /api/status on this site to see why.", {
+                error: server.failed,
+              })}
+            </p>
+          )}
+          {server.problems?.map((problem) => (
+            <p key={problem} className="status status-error small">
+              ⚠ {problem}
+            </p>
+          ))}
+          {!server.failed && <p className="small">
             {t("Running version: {version}", { version: server.version })} ·{" "}
             {server.missing?.length ? (
               <>
@@ -105,7 +120,7 @@ export default function SetupPage() {
             ) : (
               t("All optional server settings are set.")
             )}
-          </p>
+          </p>}
         </section>
       )}
       <section className="stack">

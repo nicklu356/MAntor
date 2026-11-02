@@ -21,10 +21,10 @@ export default function Header() {
   // Is real AI switched on (an API key exists on the server) or simulated?
   const [ai, setAi] = useState(null);
   useEffect(() => {
-    fetch("/api/status")
-      .then((res) => res.json())
+    fetch("/api/status", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => setAi(Boolean(data.ai)))
-      .catch(() => setAi(false));
+      .catch(() => setAi(null)); // unknown: show no badge rather than a wrong one
   }, []);
 
   const nav = [

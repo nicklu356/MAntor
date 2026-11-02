@@ -7,6 +7,12 @@ const switchUser = async (page, label) => {
   await page.waitForTimeout(300);
 };
 
+// Picks a language from the 🌐 menu in the header.
+async function chooseLanguage(page, name) {
+  await page.click(".lang-switch");
+  await page.locator(".lang-dropdown").getByText(name, { exact: true }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("main")).toContainText("Hi Mia");
@@ -189,6 +195,9 @@ test("phone width: no sideways scrolling on the main pages", async ({ page }) =>
 
 test("language: switch to Traditional Chinese and back, and the choice is remembered", async ({ page }) => {
   await page.click(".lang-switch");
+  await expect(page.locator(".lang-dropdown [aria-checked=true]")).toContainText("English"); // the current one is ticked
+  await page.keyboard.press("Escape");
+  await chooseLanguage(page, "繁體中文");
   await expect(page.locator("main")).toContainText("嗨，Mia");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW");
   await page.goto("/projects");
@@ -196,7 +205,7 @@ test("language: switch to Traditional Chinese and back, and the choice is rememb
   await expect(page.locator(".project-card").first()).toContainText("UX 設計");
   await page.reload();
   await expect(page.locator("main h1")).toContainText("專案");
-  await page.click(".lang-switch");
+  await chooseLanguage(page, "English");
   await expect(page.locator("main h1")).toContainText("Projects");
 });
 

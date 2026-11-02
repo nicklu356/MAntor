@@ -1,49 +1,21 @@
 "use client";
 
 // The account button in the header (real accounts): photo, name and ▾. It opens a small menu with
-// who you are, links to your account settings and portfolio, the language, and Log out.
-// Closes on a click outside, on Escape, and when you go to another page.
+// who you are, your portfolio, account settings and Log out.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import { useLocale } from "@/components/LocaleProvider";
 import { useUser } from "@/components/UserProvider";
+import { useDropdown } from "@/components/useDropdown";
 
 export default function AccountMenu() {
-  const { t, locale, setLocale } = useLocale();
+  const { t } = useLocale();
   const { currentUser, authInfo, isAdmin, isMentor, signOut } = useUser();
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const box = useRef(null);
-  const button = useRef(null);
-
-  useEffect(() => setOpen(false), [pathname]);
-
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e) => {
-      if (box.current && !box.current.contains(e.target)) setOpen(false);
-    };
-    const escape = (e) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        button.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
-
+  const { open, setOpen, box, button } = useDropdown();
   if (!currentUser) return null;
 
-  const role = isMentor ? t("Mentor") : t("Learner");
   return (
-    <div className="account-menu" ref={box}>
+    <div className="header-menu" ref={box}>
       <button
         ref={button}
         type="button"
@@ -66,14 +38,15 @@ export default function AccountMenu() {
             <strong>{currentUser.name}</strong>
             {authInfo?.email && <div className="muted small">{authInfo.email}</div>}
             <div className="muted small">
-              {role}
+              {isMentor ? t("Mentor") : t("Learner")}
               {isAdmin ? ` · ${t("Admin")}` : ""}
-              {!isMentor && currentUser.anonymousName ? ` · ${t("mentors see you as {anon}", { anon: currentUser.anonymousName })}` : ""}
             </div>
+            {!isMentor && currentUser.anonymousName && (
+              <div className="muted small" title={t("Mentors see you by this name")}>
+                {currentUser.anonymousName}
+              </div>
+            )}
           </div>
-          <Link href="/account" role="menuitem" className="account-dropdown-item">
-            {t("Account settings")}
-          </Link>
           {!isMentor && (
             <Link href={`/portfolio/${currentUser.id}`} role="menuitem" className="account-dropdown-item">
               {t("My portfolio")}
@@ -84,22 +57,14 @@ export default function AccountMenu() {
               {t("Admin")}
             </Link>
           )}
-          <button
-            type="button"
-            role="menuitem"
-            className="account-dropdown-item"
-            onClick={() => {
-              setOpen(false);
-              setLocale(locale === "en" ? "zh-TW" : "en");
-            }}
-          >
-            {locale === "en" ? "中文" : "English"}
-          </button>
+          <Link href="/account" role="menuitem" className="account-dropdown-item">
+            {t("Account settings")}
+          </Link>
           <div className="account-dropdown-sep" />
           <button
             type="button"
             role="menuitem"
-            className="account-dropdown-item"
+            className="account-dropdown-item danger"
             onClick={() => {
               setOpen(false);
               signOut();

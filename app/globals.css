@@ -570,6 +570,29 @@ select {
   width: auto;
 }
 
+/* Checkboxes and radios keep their own size (the rule above makes text inputs full width). */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  accent-color: var(--navy);
+}
+
+/* A checkbox with its label (and an explanation under it) on the right. */
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: none;
+}
+
 textarea {
   min-height: 110px;
   resize: vertical;
@@ -1510,7 +1533,7 @@ details.match summary::-webkit-details-marker {
 }
 
 /* Account menu (header, real accounts) */
-.account-menu {
+.header-menu {
   position: relative;
 }
 
@@ -1579,6 +1602,25 @@ button.account-chip[aria-expanded="true"] {
 .account-dropdown-item:focus-visible {
   background: var(--periwinkle-light, rgba(28, 38, 64, 0.08));
   text-decoration: none;
+}
+
+.account-dropdown-item.danger {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.lang-dropdown {
+  min-width: 170px;
+}
+
+.account-dropdown-item .tick {
+  display: inline-block;
+  width: 18px;
+  font-weight: 700;
+}
+
+.account-dropdown-item.current {
+  font-weight: 600;
 }
 
 .account-dropdown-sep {
@@ -1659,6 +1701,10 @@ button.account-chip[aria-expanded="true"] {
 /* ---------- Language switch ---------- */
 
 .lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -1668,6 +1714,12 @@ button.account-chip[aria-expanded="true"] {
   background: transparent;
   color: var(--navy);
   cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .lang-name {
+    display: none;
+  }
 }
 
 .lang-switch:hover {

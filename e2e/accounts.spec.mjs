@@ -113,6 +113,12 @@ async function signUp(page, fullName, address, dateOfBirth = "2002-03-04") {
   await page.click('button:has-text("Save and continue")');
 }
 
+// Picks a language from the 🌐 menu in the header.
+async function chooseLanguage(page, name) {
+  await page.click(".lang-switch");
+  await page.locator(".lang-dropdown").getByText(name, { exact: true }).click();
+}
+
 let browser, visitor, admin, maya, alice, bob;
 let projectUrl, teamUrl, taskUrl;
 
@@ -220,7 +226,7 @@ test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos
   // Bob reads the site in Chinese, so his emails come in Chinese.
   const bobUid = await uidOf(email("bob"));
   await bob.goto("/");
-  await bob.click(".lang-switch");
+  await chooseLanguage(bob, "繁體中文");
   await expect.poll(async () => (await profileOf(bobUid)).language?.stringValue).toBe("zh-TW");
 
   await alice.goto(teamUrl);
@@ -253,8 +259,8 @@ test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos
   expect(help.text).not.toContain("Alice");
   expect(emailsTo(email("alice")).some((m) => m.subject.includes("commented"))).toBeFalsy(); // not about your own comment
 
-  await bob.click(".lang-switch"); // back to English
-  await expect(bob.locator(".lang-switch")).toHaveText("中文");
+  await chooseLanguage(bob, "English"); // back to English
+  await expect(bob.locator(".lang-switch")).toContainText("English");
   // Alice switches emails off.
   await alice.goto("/account");
   await alice.locator('label:has-text("Email me when something needs me") input').click();
@@ -445,23 +451,22 @@ test("privacy: download my data, then delete the account and everything that bel
   expect(accounts.userInfo.some((u) => u.email === email("dora"))).toBeFalsy();
 });
 
-test("account menu: settings, portfolio, language; log out, wrong password, log back in", async () => {
+test("account menu: settings, portfolio; log out, wrong password, log back in", async () => {
   await bob.goto("/projects");
   const menu = bob.locator(".account-dropdown");
   await bob.click(".account-chip");
   await expect(menu).toContainText(email("bob"));
-  await expect(menu).toContainText("mentors see you as Learner #");
+  await expect(menu).toContainText("Learner #");
+  await expect(menu.locator("[role=menuitem]")).toHaveText(["My portfolio", "Account settings", "Log out"]); // settings just above Log out
   await menu.locator("text=Account settings").click();
   await bob.waitForURL("**/account");
   await expect(menu).toHaveCount(0); // closes on a new page
   await bob.click(".account-chip");
   await bob.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await bob.click(".account-chip");
-  await menu.locator("text=中文").click();
+  await chooseLanguage(bob, "繁體中文");
   await expect(bob.locator("main h1")).toContainText("帳號");
-  await bob.click(".account-chip");
-  await menu.locator("text=English").click();
+  await chooseLanguage(bob, "English");
   await expect(bob.locator("main h1")).toContainText("Account");
 
   await bob.click(".account-chip");

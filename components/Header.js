@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import AccountMenu from "./AccountMenu";
+import LanguageMenu from "./LanguageMenu";
 import NotificationBell from "./NotificationBell";
 import { APP_NAME } from "@/lib/config";
 import { exitDemo } from "@/lib/session";
@@ -12,7 +13,7 @@ import { useLocale } from "./LocaleProvider";
 
 export default function Header() {
   const pathname = usePathname();
-  const { t, locale, setLocale } = useLocale();
+  const { t } = useLocale();
   const { mode, users, currentUser, isMentor, isAdmin, switchUser, userName, loaded, dataError, signedOut } = useUser();
   const learners = users.filter((u) => u.role === "learner");
   const mentors = users.filter((u) => u.role === "mentor");
@@ -101,15 +102,7 @@ export default function Header() {
             </button>
           )}
 
-          <button
-            type="button"
-            className="lang-switch"
-            onClick={() => setLocale(locale === "en" ? "zh-TW" : "en")}
-            aria-label={locale === "en" ? "切換成繁體中文" : "Switch to English"}
-            title={locale === "en" ? "切換成繁體中文" : "Switch to English"}
-          >
-            {locale === "en" ? "中文" : "EN"}
-          </button>
+          <LanguageMenu />
 
           {/* Real accounts */}
           {mode === "auth" && currentUser && <AccountMenu />}

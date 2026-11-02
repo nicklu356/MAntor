@@ -235,3 +235,17 @@ test("deadlines: late badge, milestones, and moving a due date", async ({ page }
   await page.goto("/teams/team_001");
   await expect(late.locator(".badge-late")).toHaveCount(0);
 });
+
+test("mentor's week: summary of every team with one thing to do", async ({ page }) => {
+  await switchUser(page, "Grace Walker (mentor)");
+  const card = page.locator("section", { has: page.locator("h2", { hasText: "Your week" }) });
+  await card.locator("text=Summarise my week").click();
+  await expect(card).toContainText("Simulated"); // no API key in the tests
+  await expect(card).toContainText("1 active team(s)");
+  await expect(card).toContainText("Redesign a banking app onboarding flow");
+  await expect(card).toContainText("Learner #"); // anonymous names only
+  await expect(card).not.toContainText("Mia");
+  await expect(card).toContainText("Try:");
+  await page.reload();
+  await expect(card).toContainText("Summary from"); // kept in this browser
+});

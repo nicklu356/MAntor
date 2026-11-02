@@ -376,3 +376,50 @@ test("deadlines reach the bell (learners) and the mentor's attention list (3+ da
   assert.deepEqual(attention.map((i) => [i.kind, i.late.length]), [["late", 1]]);
   assert.equal(buildAttention([team], "2026-11-03").length, 0); // only 2 days late
 });
+
+// ---- Mentor weekly summary ----
+import { simulatedSummary, teamStatus, weekStats } from "../lib/weeklySummary.js";
+
+test("weekly summary: facts per team, anonymous names only, and a plain summary without AI", () => {
+  const now = Date.parse("2026-11-10T12:00:00Z");
+  const recent = "2026-11-08T10:00:00.000Z";
+  const old = "2026-10-20T10:00:00.000Z";
+  const teams = [
+    {
+      id: "busy",
+      status: "active",
+      startDate: "2026-11-01",
+      endDate: "2026-11-29",
+      memberIds: ["a", "b"],
+      project: { title: "Bank app" },
+      tasks: [
+        { id: "t1", title: "Interviews", status: "done", dueDate: "2026-11-08", submission: { submittedAt: recent, submittedBy: "a" } },
+        { id: "t2", title: "Problem", status: "todo", dueDate: "2026-11-07", helpRequest: { userId: "b", note: "Scope?", at: recent } },
+      ],
+      feedback: [],
+      comments: [{ userId: "a", createdAt: recent }],
+      contributions: [{ userId: "a", hoursSpent: 2, createdAt: recent }, { userId: "b", hoursSpent: 5, createdAt: old }],
+    },
+    { id: "calm", status: "active", memberIds: ["c"], project: { title: "Cafe" }, tasks: [{ id: "t3", title: "Plan", status: "todo" }], feedback: [], comments: [], contributions: [{ userId: "c", hoursSpent: 1, createdAt: recent }] },
+    { id: "gone", status: "disbanded", memberIds: [], project: { title: "Old" }, tasks: [] },
+  ];
+  const names = { a: "Learner #AAA", b: "Learner #BBB", c: "Learner #CCC" };
+  const stats = weekStats(teams, { anonymousName: (id) => names[id], now, today: "2026-11-10" });
+  assert.deepEqual(stats.teams.map((s) => s.teamId), ["busy", "calm"]); // active teams only
+  const busy = stats.teams[0];
+  assert.deepEqual(busy.members, ["Learner #AAA", "Learner #BBB"]);
+  assert.deepEqual(busy.submitted, ["Interviews"]);
+  assert.equal(busy.hours, 2); // last week only
+  assert.deepEqual(busy.late, [{ task: "Problem", days: 3 }]);
+  assert.deepEqual(busy.help, [{ task: "Problem", from: "Learner #BBB", note: "Scope?" }]);
+  assert.deepEqual(busy.quiet, ["Learner #BBB"]);
+  assert.equal(busy.week, 2);
+  assert.equal(teamStatus(busy), "stuck"); // open help request
+  assert.equal(teamStatus(stats.teams[1]), "on_track");
+
+  const summary = simulatedSummary(stats);
+  assert.equal(summary.overview, "2 active team(s): 1 on track, 0 need attention, 1 stuck.");
+  assert.equal(summary.teams[0].suggestion, "Answer the help request on “Problem”.");
+  assert.deepEqual(summary.priorities, ["Bank app: Answer the help request on “Problem”."]);
+  assert.equal(simulatedSummary({ teams: [] }).overview, "No active teams this week.");
+});

@@ -11,13 +11,16 @@ import { useUser } from "@/components/UserProvider";
 import {
   getProject,
   getProjectsForMentor,
+  getContributionsForTeam,
   getTasks,
+  getTeamComments,
   getTeamFeedback,
   getTeamsForProject,
   getTeamsForUser,
 } from "@/lib/db";
 import { buildAttention } from "@/lib/attention";
 import { DueBadge } from "@/components/Deadline";
+import WeeklySummary from "@/components/WeeklySummary";
 import { APP_TAGLINE } from "@/lib/config";
 import { timeAgo } from "@/lib/format";
 import { useT } from "@/components/LocaleProvider";
@@ -150,12 +153,19 @@ function MentorHome({ currentUser, userName }) {
           const teams = await getTeamsForProject(project.id);
           const detailed = await Promise.all(
             teams.map(async (team) => {
-              const [tasks, feedback] = await Promise.all([getTasks(team.id), getTeamFeedback(team.id)]);
+              const [tasks, feedback, comments, contributions] = await Promise.all([
+                getTasks(team.id),
+                getTeamFeedback(team.id),
+                getTeamComments(team.id),
+                getContributionsForTeam(team.id),
+              ]);
               return {
                 ...team,
                 project,
                 tasks,
                 feedback,
+                comments,
+                contributions,
                 done: tasks.filter((item) => item.status === "done").length,
                 total: tasks.length,
                 hasFinal: feedback.some((f) => f.kind === "final"),
@@ -191,7 +201,7 @@ function MentorHome({ currentUser, userName }) {
           </p>
         </div>
         <Link href="/projects/new" className="btn">
-          + New project
+          {t("+ New project")}
         </Link>
       </div>
 
@@ -207,6 +217,7 @@ function MentorHome({ currentUser, userName }) {
       )}
 
       {rows === null && <p className="muted">{t("Loading…")}</p>}
+      {rows && <WeeklySummary teams={allTeams} />}
       {rows && (
         <section className="card">
           <div className="spread">

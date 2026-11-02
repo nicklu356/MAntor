@@ -159,10 +159,11 @@ test("mentor: applies, is approved, publishes a project", async () => {
   await maya.fill('label:has-text("Company") input', "Acme Design");
   await maya.click("text=Apply to be a mentor");
   await expect(maya.locator("main")).toContainText("waiting for approval");
+  // The admin hears about it (before approving: once approved, there is no open application to email about).
+  await expect.poll(() => emailsTo(email("admin")).map((m) => m.subject)).toContain("New mentor application: Maya Lin");
   await admin.goto("/admin");
   await admin.locator("main li", { hasText: "Acme Design" }).locator('button:has-text("Approve")').click();
   await expect(admin.locator(".toast")).toContainText("is now a mentor");
-  await expect.poll(() => emailsTo(email("admin")).map((m) => m.subject)).toContain("New mentor application: Maya Lin");
   await expect.poll(() => emailsTo(email("maya")).map((m) => m.subject)).toContain("You are now a mentor on MAntor");
 
   await maya.goto("/projects/new");
@@ -294,6 +295,14 @@ test("deadlines: a new team gets a calendar; the daily job emails tasks due tomo
   const reminder = emailsTo(email("bob")).find((m) => m.subject === "Due tomorrow in “Accounts test project”");
   expect(reminder.text).toContain(open.fields.title.stringValue);
   expect((await (await run("test-cron-secret")).json()).sent).toBe(0); // once per team and day
+
+  // Monday: the mentor's week by email, with learners by anonymous name only.
+  const weekly = await fetch("http://localhost:3200/api/cron/weekly", { headers: { Authorization: "Bearer test-cron-secret" } });
+  expect((await weekly.json()).sent).toBe(1);
+  const digest = emailsTo(email("maya")).find((m) => m.subject.startsWith("Your week as a mentor"));
+  expect(digest.text).toContain("Accounts test project");
+  expect(digest.text).toContain("Try:");
+  expect(digest.text).not.toContain("Bob");
 });
 
 test("profile photo: shrunk to 256 x 256, seen by teammates and the accepted mentor only", async () => {

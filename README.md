@@ -11,6 +11,68 @@ Students and career changers need hands-on experience, but online learning rarel
 
 ---
 
+## 📸 Screenshots
+
+| | |
+|---|---|
+| ![Home: the learner's career assessment result](docs/screenshots/home.png) **Home** | ![Career assessment result with every field's fit](docs/screenshots/assessment.png) **Career assessment** |
+| ![Projects ranked by fit](docs/screenshots/projects.png) **Projects, ranked by fit** | ![Team board with deadlines and milestones](docs/screenshots/team-board.png) **Team board, deadlines and milestones** |
+| ![A task with AI feedback on the mentor's criteria](docs/screenshots/task-feedback.png) **AI feedback on the mentor's criteria** | ![The mentor's weekly summary](docs/screenshots/mentor-week.png) **The mentor's week** |
+| ![A learner's portfolio](docs/screenshots/portfolio.png) **Portfolio** | ![The team board in Traditional Chinese](docs/screenshots/chinese.png) **繁體中文** |
+
+Taken from the demo (sample learners and mentors, no AI key, hence the *Simulated* badges). To take them again: build and start the demo without Firebase keys, then `node scripts/screenshots.mjs http://localhost:3000`.
+
+---
+
+## 🏗️ How it fits together
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser (Next.js pages, React)"]
+    UI["Pages and components<br/>EN / 繁體中文"]
+    DB["lib/db.js<br/>every read and write"]
+    Mock[("Demo data<br/>localStorage")]
+  end
+
+  subgraph Vercel["Vercel (Next.js server routes)"]
+    AIR["/api/feedback, coach, analysis,<br/>assessment, project-draft,<br/>mentor-summary"]
+    Notify["/api/notify<br/>emails after an action"]
+    Cron["/api/cron/reminders (daily)<br/>/api/cron/weekly (Mondays)"]
+    Account["/api/account/delete<br/>/p/[id] public portfolio"]
+  end
+
+  subgraph Firebase["Google Firebase"]
+    Auth["Authentication<br/>email, Google"]
+    FS[("Firestore<br/>+ security rules")]
+  end
+
+  Claude["Claude API"]
+  SMTP["Mail server (SMTP)"]
+
+  UI --> DB
+  DB -- "demo" --> Mock
+  DB -- "accounts, live updates" --> FS
+  UI -- "sign in" --> Auth
+  UI -- "AI requests" --> AIR
+  AIR --> Claude
+  AIR -- "verified scores (Admin SDK)" --> FS
+  DB -- "after an action" --> Notify
+  Notify -- "checks the action (Admin SDK)" --> FS
+  Notify --> SMTP
+  Cron --> FS
+  Cron --> Claude
+  Cron --> SMTP
+  Account --> FS
+  Account --> Auth
+```
+
+* **The browser does most of the work.** Pages read and write Firestore directly through `lib/db.js`, and the security rules in `firestore.rules` decide what each signed-in person may do. In the demo, the same functions use the browser's own storage instead
+* **The server keeps the secrets.** The Claude key, the Firebase service account and the mail password exist only in server routes. Things a learner must not be able to fake (AI scores, public portfolios, emails to other people) are done by the server with the Firebase Admin SDK, after checking who is asking
+* **Mentors only see anonymous names**, in the app, in AI prompts and in emails. A learner's real name reaches a mentor only through a connection request the learner accepts
+* **Everything works without keys:** no Firebase key, the demo; no Claude key, simulated AI answers; no mail settings, no emails
+
+---
+
 ## ✅ MVP status
 
 | Feature | Status |
@@ -74,9 +136,12 @@ GitHub Actions runs all of them on every push to `main` and on every pull reques
 
 ## 🛠️ Tech stack
 
-* **Frontend and backend:** Next.js (React)
-* **Database:** Firebase Firestore
-* **AI:** Claude API
+* **Frontend and backend:** Next.js (React), server routes for AI, email and scheduled jobs
+* **Database and accounts:** Firebase Firestore (live updates, security rules) and Firebase Authentication
+* **AI:** Claude API (structured outputs)
+* **Email:** any SMTP server (for example Gmail), Vercel Cron for reminders
+* **Languages:** English and Traditional Chinese
+* **Tests:** Node's test runner, Playwright, Firebase emulators, GitHub Actions
 * **Design:** Figma
 * **Deployment:** Vercel
 * **Collaboration:** GitHub

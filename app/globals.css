@@ -191,10 +191,12 @@ p {
 }
 
 .user-switch select {
-  max-width: 200px;
+  max-width: 190px;
 }
 
-@media (max-width: 1200px) {
+/* The demo header is the widest (logo, menu, two badges, bell, person switch, language):
+   drop the "Viewing as" label before the row wraps. */
+@media (max-width: 1400px) {
   .viewing-as {
     display: none;
   }

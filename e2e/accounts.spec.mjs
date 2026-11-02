@@ -445,9 +445,27 @@ test("privacy: download my data, then delete the account and everything that bel
   expect(accounts.userInfo.some((u) => u.email === email("dora"))).toBeFalsy();
 });
 
-test("log out, wrong password, log back in", async () => {
-  await bob.goto("/account");
-  await bob.click("main >> text=Log out");
+test("account menu: settings, portfolio, language; log out, wrong password, log back in", async () => {
+  await bob.goto("/projects");
+  const menu = bob.locator(".account-dropdown");
+  await bob.click(".account-chip");
+  await expect(menu).toContainText(email("bob"));
+  await expect(menu).toContainText("mentors see you as Learner #");
+  await menu.locator("text=Account settings").click();
+  await bob.waitForURL("**/account");
+  await expect(menu).toHaveCount(0); // closes on a new page
+  await bob.click(".account-chip");
+  await bob.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await bob.click(".account-chip");
+  await menu.locator("text=中文").click();
+  await expect(bob.locator("main h1")).toContainText("帳號");
+  await bob.click(".account-chip");
+  await menu.locator("text=English").click();
+  await expect(bob.locator("main h1")).toContainText("Account");
+
+  await bob.click(".account-chip");
+  await menu.locator("text=Log out").click();
   await expect(bob.locator(".header")).toContainText("Sign up");
   await bob.goto("/login");
   await bob.fill('input[type="email"]', email("bob"));

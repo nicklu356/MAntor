@@ -1509,6 +1509,84 @@ details.match summary::-webkit-details-marker {
   text-decoration: none;
 }
 
+/* Account menu (header, real accounts) */
+.account-menu {
+  position: relative;
+}
+
+button.account-chip {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+button.account-chip:hover,
+button.account-chip[aria-expanded="true"] {
+  background: rgba(28, 38, 64, 0.08);
+}
+
+.chevron {
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+
+.chevron-up {
+  transform: rotate(180deg);
+}
+
+.account-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 240px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+  z-index: 30;
+}
+
+.account-dropdown-head {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+
+.account-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.account-dropdown-item:hover,
+.account-dropdown-item:focus-visible {
+  background: var(--periwinkle-light, rgba(28, 38, 64, 0.08));
+  text-decoration: none;
+}
+
+.account-dropdown-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
 .account-avatar {
   display: inline-flex;
   align-items: center;

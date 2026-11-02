@@ -340,15 +340,15 @@ function EmailSettings() {
   const { t, locale } = useLocale();
   const toast = useToast();
   const { currentUser, profile, refreshProfile, authInfo } = useUser();
-  const [mailReady, setMailReady] = useState(null);
+  const [mailStatus, setMailStatus] = useState(null); // { mail, admin } from /api/status
   const [busy, setBusy] = useState(false);
   const on = profile?.emailNotifications !== false;
 
   useEffect(() => {
     fetch("/api/status")
       .then((res) => res.json())
-      .then((data) => setMailReady(Boolean(data.mail && data.admin)))
-      .catch(() => setMailReady(false));
+      .then((data) => setMailStatus({ mail: Boolean(data.mail), admin: Boolean(data.admin) }))
+      .catch(() => setMailStatus({ mail: false, admin: false }));
   }, []);
 
   async function toggle() {
@@ -387,8 +387,13 @@ function EmailSettings() {
       {authInfo && !authInfo.emailVerified && (
         <p className="status small">{t("Verify your email address first: emails only go to verified addresses.")}</p>
       )}
-      {mailReady === false && (
-        <p className="muted small">{t("Email is not set up on this site yet, so nothing is sent for now.")}</p>
+      {mailStatus && !(mailStatus.mail && mailStatus.admin) && (
+        <p className="muted small">
+          {t("Email is not set up on this site yet, so nothing is sent for now.")}
+          {/* Admins see what is missing, so they can fix it in Vercel. */}
+          {currentUser.admin && !mailStatus.mail && ` ${t("Missing on the server: SMTP_HOST, SMTP_USER or SMTP_PASS (then redeploy).")}`}
+          {currentUser.admin && !mailStatus.admin && ` ${t("Missing on the server: FIREBASE_SERVICE_ACCOUNT (then redeploy).")}`}
+        </p>
       )}
     </section>
   );

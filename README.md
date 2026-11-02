@@ -44,6 +44,7 @@ Students and career changers need hands-on experience, but online learning rarel
 | Live updates: board, discussion, submissions, feedback and team appear for everyone without reloading (also between tabs in the demo) | ✅ Built |
 | Demo without an account ("Try the demo": sample learners and mentors, "Viewing as" switch) | ✅ Built |
 | Email notifications (comments, help requests, final feedback, connection requests, mentor applications), in each person's language, can be switched off | ✅ Built (needs SMTP settings and `FIREBASE_SERVICE_ACCOUNT`) |
+| Deadlines and milestones: projects last N weeks, each task is due at the end of its week; late badges, a weekly timeline with "on track / behind plan", reminders in the bell, late teams on the mentor's list, and a daily reminder email the day before | ✅ Built (emails need `CRON_SECRET` too) |
 | English and Traditional Chinese (繁體中文): button in the header, Chinese browsers get Chinese automatically, AI answers in the chosen language | ✅ Built |
 
 ### 🔌 What happens without an API key
@@ -191,6 +192,8 @@ SITE_URL=https://your-app.vercel.app
 
 3. Redeploy. It also needs `FIREBASE_SERVICE_ACCOUNT` (step 4): the server checks every action really happened before emailing anyone, so nobody can use it to send email of their own
 
+**Deadline reminders:** a daily job (`/api/cron/reminders`, scheduled in `vercel.json` for 21:00 UTC, which is 8 am in Melbourne) emails each team the day before tasks are due. Add `CRON_SECRET` (any long random text) to Vercel's environment variables: Vercel sends it with every scheduled run, and the job refuses calls without it. `REMINDER_TIME_ZONE` (default `Australia/Melbourne`) decides what "tomorrow" means.
+
 Emails only go to **verified** addresses (Google accounts are verified; email accounts once the person clicks the verification link). Mentors see learners by anonymous name in email too. To try it without sending anything, set `MAIL_OUTBOX=mail.jsonl`: each email is written to that file instead. Gmail allows about 500 emails a day, plenty for a pilot.
 
 **What stays private:** a learner's real name and email are in `profiles/{uid}` (only they can read it). Teammates see each other's names through `teamNames/{teamId}` (members only). Mentors see anonymous names until a learner accepts their connection request.
@@ -257,6 +260,7 @@ app/
   api/project-draft/route.js       AI draft of criteria and tasks for a mentor's project
   api/status/route.js              Tells the header if AI is live or simulated
   api/notify/route.js              Email notifications: checks the action, emails the people it concerns
+  api/cron/reminders/route.js      Daily email: tasks due tomorrow (run by Vercel Cron)
 components/
   Header.js                        Menu, AI/mode badges, "Viewing as" switch (learners and mentors)
   UserProvider.js                  Who is using the app (demo switch or signed-in account); userName() decides which name each viewer may see
@@ -277,6 +281,7 @@ components/
   ConnectionRequests.js            Learner accepts or declines mentor requests
   NotificationBell.js              Bell in the header
   Hero.js, Toast.js                Home banner; small confirmation messages
+  Deadline.js                      Due badges, the editable due date, the milestones timeline
   LocaleProvider.js                The chosen language: useT() gives components the translator
 lib/
   db.js                            Every read and write (Firebase or demo mode)
@@ -295,6 +300,8 @@ lib/
   server/firebaseAdmin.js          Server access to Firebase (verified feedback, public portfolios)
   server/portfolio.js              Builds the public portfolio
   server/mail.js, server/notifyEvents.js  Sending email (SMTP or a test file); who hears about what
+  server/deliver.js                Emails a list of people (verified, opted in, in their language)
+  schedule.js                      Deadlines: project weeks, due dates, late/soon, milestones
   notify.js                        Browser side: asks the server to email after an action
   session.js                       Demo or real accounts
   live.js                          useLiveList / useLiveDoc hooks (live updates)

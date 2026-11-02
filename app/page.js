@@ -17,6 +17,7 @@ import {
   getTeamsForUser,
 } from "@/lib/db";
 import { buildAttention } from "@/lib/attention";
+import { DueBadge } from "@/components/Deadline";
 import { APP_TAGLINE } from "@/lib/config";
 import { timeAgo } from "@/lib/format";
 import { useT } from "@/components/LocaleProvider";
@@ -31,11 +32,13 @@ function LearnerHome({ currentUser }) {
       const withProjects = await Promise.all(
         list.map(async (team) => {
           const [project, tasks] = await Promise.all([getProject(team.projectId), getTasks(team.id)]);
-          // "Up next": my task in progress first, then any open task nobody took yet.
+          // "Up next": my task in progress first, then my other open tasks, then any open task nobody
+          // took yet; the earliest deadline first within each.
+          const byDue = [...tasks].sort((a, b) => String(a.dueDate || "9999").localeCompare(String(b.dueDate || "9999")));
           const next =
-            tasks.find((item) => item.status === "in_progress" && item.assigneeIds.includes(currentUser.id)) ||
-            tasks.find((item) => item.status !== "done" && item.assigneeIds.includes(currentUser.id)) ||
-            tasks.find((item) => item.status === "todo" && item.assigneeIds.length === 0);
+            byDue.find((item) => item.status === "in_progress" && item.assigneeIds.includes(currentUser.id)) ||
+            byDue.find((item) => item.status !== "done" && item.assigneeIds.includes(currentUser.id)) ||
+            byDue.find((item) => item.status === "todo" && item.assigneeIds.length === 0);
           return { ...team, project, done: tasks.filter((item) => item.status === "done").length, total: tasks.length, next };
         })
       );
@@ -120,11 +123,12 @@ function LearnerHome({ currentUser }) {
                 <div className="bar-fill" style={{ width: `${team.total ? (team.done / team.total) * 100 : 0}%` }} />
               </div>
               <span className="muted small">
-                {team.done} of {team.total} tasks done · {team.memberIds.length} of {team.project?.teamSize} members
+                {t("{done} of {total} tasks done", { done: team.done, total: team.total })} ·{" "}
+                {t("{n} of {size} members", { n: team.memberIds.length, size: team.project?.teamSize })}
               </span>
               {team.next && team.status === "active" && (
                 <span className="small">
-                  <strong>{t("Up next:")}</strong> {team.next.title}
+                  <strong>{t("Up next:")}</strong> {team.next.title} <DueBadge task={team.next} />
                 </span>
               )}
             </Link>
@@ -225,17 +229,24 @@ function MentorHome({ currentUser, userName }) {
                 <li key={item.id}>
                   <div className="spread">
                     <div>
-                      <span className={item.kind === "help" ? "badge badge-amber" : "badge"}>
+                      <span className={item.kind === "help" ? "badge badge-amber" : item.kind === "late" ? "badge badge-late" : "badge"}>
                         {item.kind === "help"
                           ? t("Help request")
                           : item.kind === "struggling"
                             ? t("Low AI score")
-                            : t("Ready for final feedback")}
+                            : item.kind === "late"
+                              ? t("Behind schedule")
+                              : t("Ready for final feedback")}
                       </span>{" "}
                       <Link href={item.href}>
                         <strong>
                           {item.kind === "final"
                             ? t("{project}: every task is done", { project: item.project?.title })
+                            : item.kind === "late"
+                              ? t(item.late.length > 1 ? "{project}: {n} tasks are late" : "{project}: {n} task is late", {
+                                  project: item.project?.title,
+                                  n: item.late.length,
+                                })
                             : item.kind === "help"
                               ? t("{name} on “{task}”", { name: userName(item.userId), task: item.task.title })
                               : t("“{task}” scored {score}/5 in its latest review", { task: item.task.title, score: item.lowest })}

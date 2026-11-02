@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { DIFFICULTIES, FIELDS, MAX_PROJECT_DESCRIPTION_CHARS, MAX_TEAM_SIZE, MIN_TEAM_SIZE } from "@/lib/config";
 import { useLocale } from "@/components/LocaleProvider";
+import { DEFAULT_WEEKS, MAX_WEEKS, MIN_WEEKS, clampWeeks, templateWeeks } from "@/lib/schedule";
 
 const emptyCriterion = () => ({ name: "", description: "" });
 const emptyTask = () => ({ title: "", description: "", criteriaIndexes: [0] });
@@ -18,12 +19,14 @@ export function projectToForm(project) {
     field: project.field,
     difficulty: project.difficulty,
     teamSize: project.teamSize,
+    durationWeeks: clampWeeks(project.durationWeeks),
     description: project.description,
     criteria: project.criteria.map((c) => ({ ...c })),
     taskTemplates: (project.taskTemplates || []).map((item) => ({
       title: item.title,
       description: item.description,
       criteriaIndexes: item.criteriaIds.map((id) => project.criteria.findIndex((c) => c.id === id)).filter((i) => i >= 0),
+      week: item.week,
     })),
   };
 }
@@ -33,6 +36,7 @@ export const emptyProjectForm = () => ({
   field: FIELDS[0],
   difficulty: "beginner",
   teamSize: 3,
+  durationWeeks: DEFAULT_WEEKS,
   description: "",
   criteria: [emptyCriterion()],
   taskTemplates: [emptyTask()],
@@ -56,6 +60,8 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
   const [drafting, setDrafting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Each task's week: the mentor's choice, or spread evenly over the project's length.
+  const weeks = templateWeeks(form.taskTemplates, form.durationWeeks);
 
   const set = (changes) => setForm((f) => ({ ...f, ...changes }));
   const setCriterion = (i, changes) =>
@@ -167,6 +173,26 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
               ))}
             </select>
           </label>
+          <label className="field">
+            {t("Length")}
+            <select
+              value={clampWeeks(form.durationWeeks)}
+              onChange={(e) => {
+                const weeks = Number(e.target.value);
+                // Keep each task's week inside the new length.
+                set({
+                  durationWeeks: weeks,
+                  taskTemplates: form.taskTemplates.map((item) => (item.week > weeks ? { ...item, week: weeks } : item)),
+                });
+              }}
+            >
+              {Array.from({ length: MAX_WEEKS - MIN_WEEKS + 1 }, (_, i) => MIN_WEEKS + i).map((n) => (
+                <option key={n} value={n}>
+                  {t(n === 1 ? "{n} week" : "{n} weeks", { n })}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <label className="field">
           {t("Workplace scenario")}
@@ -251,7 +277,21 @@ export default function ProjectForm({ initial, submitLabel, onSubmit, hasTeams }
         {form.taskTemplates.map((item, i) => (
           <div key={i} className="editor-item">
             <div className="spread">
-              <strong>{t("Task {n}", { n: i + 1 })}</strong>
+              <span className="row">
+                <strong>{t("Task {n}", { n: i + 1 })}</strong>
+                <select
+                  className="select-small"
+                  value={weeks[i]}
+                  onChange={(e) => setTask(i, { week: Number(e.target.value) })}
+                  aria-label={t("Task {n} due in week", { n: i + 1 })}
+                >
+                  {Array.from({ length: clampWeeks(form.durationWeeks) }, (_, w) => w + 1).map((w) => (
+                    <option key={w} value={w}>
+                      {t("Due end of week {n}", { n: w })}
+                    </option>
+                  ))}
+                </select>
+              </span>
               <span className="row">
                 <button type="button" className="btn btn-ghost btn-small" onClick={() => moveTask(i, -1)} disabled={i === 0} aria-label={t("Move up")}>
                   ↑

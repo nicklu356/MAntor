@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { DueBadge, Milestones, useTeamWeek } from "@/components/Deadline";
 import FinalFeedback from "@/components/FinalFeedback";
 import PersonalAnalysis from "@/components/PersonalAnalysis";
 import ProgressPanel from "@/components/ProgressPanel";
@@ -36,6 +37,7 @@ export default function TeamPage() {
   const [leaveError, setLeaveError] = useState("");
   const [dragging, setDragging] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
+  const teamWeek = useTeamWeek(team);
 
   const projectId = team?.projectId;
   useEffect(() => {
@@ -108,6 +110,7 @@ export default function TeamPage() {
           <p className="muted small">
             {t("Team:")} {team.memberIds.map(userName).join(", ")} ·{" "}
             {t("{done} of {total} tasks done", { done: doneCount, total: tasks.length })} · {t(team.status)}
+            {teamWeek && ` · ${teamWeek}`}
           </p>
         </div>
         <div className="row">
@@ -199,6 +202,7 @@ export default function TeamPage() {
                   </span>
                   <div className="row">
                     {task.submission && <span className="badge badge-green">{t("Submitted")}</span>}
+                    <DueBadge task={task} />
                   </div>
                   {isMember && (
                     <div className="row">
@@ -235,6 +239,8 @@ export default function TeamPage() {
           {t("Tip: drag cards between columns, or use the arrows.")}
         </p>
       )}
+
+      <Milestones team={team} tasks={tasks} />
 
       {project && <TeamMembers team={team} project={project} canConnect={isProjectMentor} />}
 

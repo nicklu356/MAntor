@@ -214,3 +214,24 @@ test("language: a Chinese browser gets Chinese pages, rendered on the server too
   }
   await context.close();
 });
+
+test("deadlines: late badge, milestones, and moving a due date", async ({ page }) => {
+  await page.goto("/teams/team_001");
+  const late = page.locator(".task-card", { hasText: "Write the problem statement" });
+  await expect(late.locator(".badge-late")).toHaveText("2 days late");
+  await expect(page.locator("main")).toContainText("Week 3 of 4");
+  const timeline = page.locator("section", { has: page.locator("h2", { hasText: "Milestones" }) });
+  await expect(timeline).toContainText("Behind plan");
+  await expect(timeline.locator("li.done")).toHaveCount(1); // week 1: the interviews are done
+  await expect(timeline.locator("li.late")).toHaveCount(1); // week 2: the problem statement is late
+
+  await late.locator("a").click();
+  await page.click("text=Change");
+  const inFiveDays = new Date(Date.now() + 5 * 86400000);
+  const pad = (n) => String(n).padStart(2, "0");
+  await page.fill('input[aria-label="Due date"]', `${inFiveDays.getFullYear()}-${pad(inFiveDays.getMonth() + 1)}-${pad(inFiveDays.getDate())}`);
+  await page.click("form >> text=Save");
+  await expect(page.locator(".toast")).toContainText("Due date changed");
+  await page.goto("/teams/team_001");
+  await expect(late.locator(".badge-late")).toHaveCount(0);
+});

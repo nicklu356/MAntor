@@ -24,6 +24,8 @@ export const EMULATOR_ENV = {
   MAIL_OUTBOX: path.join(os.tmpdir(), "mantor-e2e-mail.jsonl"),
   SMTP_HOST: "",
   SITE_URL: "http://localhost:3200",
+  CRON_SECRET: "test-cron-secret",
+  REMINDER_TIME_ZONE: "UTC",
 };
 
 export default defineConfig({

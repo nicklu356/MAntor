@@ -310,3 +310,69 @@ test("every text the code passes to t() has a Traditional Chinese translation", 
   }
   assert.deepEqual([...missing], []);
 });
+
+// ---- Deadlines and milestones ----
+import { dueLabel, dueState, milestones, planTeamSchedule, teamProgress, templateWeeks } from "../lib/schedule.js";
+import { buildAttention } from "../lib/attention.js";
+
+test("schedule: tasks spread over the weeks, each due at the end of its week", () => {
+  assert.deepEqual(templateWeeks([{}, {}, {}, {}], 4), [1, 2, 3, 4]);
+  assert.deepEqual(templateWeeks([{}, {}, {}, {}, {}, {}, {}, {}], 4), [1, 1, 2, 2, 3, 3, 4, 4]);
+  assert.deepEqual(templateWeeks([{ week: 3 }, { week: 99 }], 3), [3, 3]); // invalid weeks fall back to the spread
+  const plan = planTeamSchedule({ durationWeeks: 2, taskTemplates: [{}, { week: 1 }] }, "2026-12-28");
+  assert.equal(plan.endDate, "2027-01-11"); // across the new year
+  assert.deepEqual(plan.tasks, [{ week: 1, dueDate: "2027-01-04" }, { week: 1, dueDate: "2027-01-04" }]);
+});
+
+test("due state and label: late, today, tomorrow, soon, later; nothing once done", () => {
+  const t = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]);
+  const task = (dueDate, status = "todo") => ({ dueDate, status });
+  assert.equal(dueLabel(task("2026-11-01"), t, "2026-11-04"), "3 days late");
+  assert.equal(dueLabel(task("2026-11-03"), t, "2026-11-04"), "1 day late");
+  assert.equal(dueLabel(task("2026-11-04"), t, "2026-11-04"), "Due today");
+  assert.equal(dueLabel(task("2026-11-05"), t, "2026-11-04"), "Due tomorrow");
+  assert.equal(dueLabel(task("2026-11-07"), t, "2026-11-04"), "Due in 3 days");
+  assert.match(dueLabel(task("2026-11-20"), t, "2026-11-04"), /^Due 20 Nov/);
+  assert.equal(dueState(task("2026-11-01", "done"), "2026-11-04"), null);
+  assert.equal(dueState({ status: "todo" }, "2026-11-04"), null);
+});
+
+test("team progress and milestones", () => {
+  const team = { startDate: "2026-11-01", endDate: "2026-11-29", status: "active" };
+  const tasks = [
+    { id: "a", week: 1, dueDate: "2026-11-08", status: "done" },
+    { id: "b", week: 2, dueDate: "2026-11-15", status: "todo" },
+    { id: "c", week: 4, dueDate: "2026-11-29", status: "todo" },
+  ];
+  const progress = teamProgress(team, "2026-11-17");
+  assert.equal(progress.week, 3);
+  assert.equal(progress.weeks, 4);
+  assert.equal(progress.daysLeft, 12);
+  const steps = milestones(team, tasks, "2026-11-17");
+  assert.deepEqual(steps.map((s) => [s.week, s.done, s.late, s.current, s.tasks.length]), [
+    [1, true, false, false, 1],
+    [2, false, true, false, 1],
+    [3, false, false, true, 0],
+    [4, false, false, false, 1],
+  ]);
+  assert.equal(milestones({}, tasks).length, 0); // teams from before deadlines existed
+});
+
+test("deadlines reach the bell (learners) and the mentor's attention list (3+ days late)", () => {
+  const team = {
+    id: "team1",
+    status: "active",
+    project: { title: "P" },
+    tasks: [
+      { id: "a", title: "Research", dueDate: "2026-11-05", status: "todo", assigneeIds: [] },
+      { id: "b", title: "Draft", dueDate: "2026-11-01", status: "in_progress", assigneeIds: [] },
+    ],
+  };
+  const items = buildNotifications({ viewer: { id: "u1", role: "learner" }, teams: [team], userName: () => "x", today: "2026-11-04" });
+  assert.deepEqual(items.map((i) => i.text).sort(), ["“Draft” is past its due date", "“Research” is due tomorrow"]);
+  const mentorItems = buildNotifications({ viewer: { id: "m1", role: "mentor" }, teams: [team], userName: () => "x", today: "2026-11-04" });
+  assert.equal(mentorItems.length, 0);
+  const attention = buildAttention([team], "2026-11-04");
+  assert.deepEqual(attention.map((i) => [i.kind, i.late.length]), [["late", 1]]);
+  assert.equal(buildAttention([team], "2026-11-03").length, 0); // only 2 days late
+});

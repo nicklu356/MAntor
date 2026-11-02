@@ -275,6 +275,27 @@ test("teamwork: submit, verified AI feedback, contribution, comment, help, kudos
   expect(emailsTo(email("alice")).some((m) => m.subject.startsWith("Final feedback"))).toBeFalsy(); // switched off
 });
 
+test("deadlines: a new team gets a calendar; the daily job emails tasks due tomorrow", async () => {
+  await alice.goto(teamUrl);
+  await expect(alice.locator("main")).toContainText("Week 1 of 4");
+  await expect(alice.locator("main h2", { hasText: "Milestones" })).toBeVisible();
+  const teamId = teamUrl.split("/").pop();
+  const tasks = (await allDocs("tasks")).filter((d) => d.fields.teamId.stringValue === teamId);
+  expect(tasks.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.fields.dueDate?.stringValue))).toBeTruthy();
+
+  // Make one open task due tomorrow, then run the daily job the way Vercel does.
+  const open = tasks.find((d) => d.fields.status.stringValue !== "done");
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  await setField("tasks", open.name.split("/").pop(), "dueDate", { stringValue: tomorrow });
+  const run = (secret) => fetch("http://localhost:3200/api/cron/reminders", { headers: { Authorization: `Bearer ${secret}` } });
+  expect((await run("wrong")).status).toBe(401);
+  const result = await (await run("test-cron-secret")).json();
+  expect(result.sent).toBeGreaterThanOrEqual(1);
+  const reminder = emailsTo(email("bob")).find((m) => m.subject === "Due tomorrow in “Accounts test project”");
+  expect(reminder.text).toContain(open.fields.title.stringValue);
+  expect((await (await run("test-cron-secret")).json()).sent).toBe(0); // once per team and day
+});
+
 test("profile photo: shrunk to 256 x 256, seen by teammates and the accepted mentor only", async () => {
   await alice.goto("/account");
   await alice.setInputFiles('input[type="file"]', { name: "me.png", mimeType: "image/png", buffer: testPng() });

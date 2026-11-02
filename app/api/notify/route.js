@@ -4,10 +4,9 @@
 //
 // An email only goes to people who switched email notifications on (the default) and whose
 // address is verified (Google accounts are; email accounts after clicking the verification link).
-import { headers } from "next/headers";
-import { translator, LOCALES } from "@/lib/i18n";
-import { adminAuth, adminDb, hasAdmin, readDoc, requestUser } from "@/lib/server/firebaseAdmin";
-import { hasMail, renderEmail, sendMail } from "@/lib/server/mail";
+import { claimOnce, emailPeople, siteUrl } from "@/lib/server/deliver";
+import { hasAdmin, requestUser } from "@/lib/server/firebaseAdmin";
+import { hasMail } from "@/lib/server/mail";
 import { EVENTS, planEmails } from "@/lib/server/notifyEvents";
 import { readJson } from "@/lib/server/ai";
 
@@ -22,16 +21,6 @@ function tooMany(uid) {
   calls.set(uid, recent);
   if (calls.size > 5000) calls.clear();
   return recent.length > 30;
-}
-
-async function siteUrl() {
-  // Links in emails: SITE_URL if set, else the Vercel production address, else this request's host.
-  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, "");
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  const h = await headers();
-  const host = h.get("x-forwarded-host") || h.get("host");
-  const proto = h.get("x-forwarded-proto") || (host?.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
 }
 
 export async function POST(request) {
@@ -52,34 +41,9 @@ export async function POST(request) {
     const plan = await planEmails(event, id, caller.uid);
     if (plan.error) return Response.json({ error: plan.error }, { status: plan.status });
 
-    // One email per event: the log entry can only be created once (it holds no personal data).
-    try {
-      await adminDb().collection("mailLog").doc(plan.key).create({ event, at: new Date().toISOString() });
-    } catch (error) {
-      if (error.code === 6) return Response.json({ sent: 0, duplicate: true }); // ALREADY_EXISTS
-      throw error;
-    }
-
-    const base = await siteUrl();
-    let sent = 0;
-    for (const uid of [...new Set(plan.recipients)].filter((r) => r !== caller.uid)) {
-      const [profile, account] = await Promise.all([
-        readDoc("profiles", uid),
-        adminAuth().getUser(uid).catch(() => null),
-      ]);
-      if (!account?.email || !account.emailVerified || profile?.emailNotifications === false) continue;
-      const t = translator(LOCALES.includes(profile?.language) ? profile.language : "en");
-      const { subject, lines, action } = plan.email(t);
-      const { text, html } = renderEmail({
-        subject,
-        lines,
-        action: { label: action.label, url: base + action.path },
-        footer: t("You get this email because email notifications are on. Switch them off on your Account page: {url}", {
-          url: `${base}/account`,
-        }),
-      });
-      if (await sendMail({ to: account.email, subject, text, html })) sent += 1;
-    }
+    if (!(await claimOnce(plan.key, event))) return Response.json({ sent: 0, duplicate: true });
+    const recipients = plan.recipients.filter((uid) => uid !== caller.uid);
+    const sent = await emailPeople(recipients, plan.email, await siteUrl());
     return Response.json({ sent });
   } catch (error) {
     console.error("Notification email failed:", error);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CoachPanel from "@/components/CoachPanel";
+import { DueDate } from "@/components/Deadline";
 import CommentThread from "@/components/CommentThread";
 import ContributionForm from "@/components/ContributionForm";
 import FeedbackPanel from "@/components/FeedbackPanel";
@@ -12,7 +13,7 @@ import HelpRequest from "@/components/HelpRequest";
 import { useToast } from "@/components/Toast";
 import { useUser } from "@/components/UserProvider";
 import { MAX_SUBMISSION_CHARS } from "@/lib/config";
-import { getProject, getTeam, submitTask, toggleKudos } from "@/lib/db";
+import { getProject, getTeam, submitTask, toggleKudos, updateTask } from "@/lib/db";
 import { useLiveDoc, useLiveList } from "@/lib/live";
 import { useT } from "@/components/LocaleProvider";
 
@@ -117,6 +118,20 @@ export default function TaskPage() {
                   ? t("Assigned to {names}", { names: task.assigneeIds.map(userName).join(", ") })
                   : t("Nobody assigned yet")}
               </span>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <DueDate
+                task={task}
+                canEdit={isMember && task.status !== "done"}
+                onSave={async (dueDate) => {
+                  try {
+                    await updateTask(task.id, { dueDate });
+                    toast(t("Due date changed"));
+                  } catch (err) {
+                    toast(err.message || t("Something went wrong"), "error");
+                  }
+                }}
+              />
             </div>
             <p>{task.description}</p>
             <div className="eyebrow" style={{ marginTop: 16 }}>

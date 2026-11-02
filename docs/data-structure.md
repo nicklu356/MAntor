@@ -94,6 +94,7 @@ users (learners and mentors)
 | `company` | string | Mentor's company | `"Northwind Digital"` |
 | `difficulty` | string | `"beginner"`, `"intermediate"` or `"advanced"` | `"beginner"` |
 | `teamSize` | number | Learners per team (2 to 5) | `3` |
+| `durationWeeks` | number | How many weeks a team has (1 to 12; 4 if missing) | `4` |
 | `criteria` | array | Mentor's standards (see below) | |
 | `taskTemplates` | array | Tasks every new team gets (see below) | |
 | `createdAt` | string | Created time | |
@@ -113,6 +114,7 @@ users (learners and mentors)
 | `title` | string | Task name |
 | `description` | string | Task instructions |
 | `criteriaIds` | array of string | Which criteria this task is judged on |
+| `week` | number | The week of the project this task is due in (its milestone) |
 
 * ✍️ Mentors create and edit projects at `/projects/new` and `/projects/[id]/edit` (optional `updatedAt`). Edits apply to teams created afterwards; existing criteria keep their ids
 * 📏 `criteria` are the **industry standard set by the mentor**; AI feedback scores work against them
@@ -128,6 +130,8 @@ users (learners and mentors)
 | `projectId` | string | Project the team works on (links to `projects`) | `"project_001"` |
 | `memberIds` | array of string | Members (links to `users`) | `["user_001", "user_002"]` |
 | `status` | string | `"active"`, `"completed"` or `"disbanded"` (everyone left) | `"active"` |
+| `startDate` | string | The day the team started (`YYYY-MM-DD`) | `"2026-11-01"` |
+| `endDate` | string | `startDate` + the project's weeks | `"2026-11-29"` |
 | `createdAt` | string | Created time | |
 
 * ✅ `status` becomes `"completed"` when the mentor gives final feedback and every task is done
@@ -150,6 +154,8 @@ users (learners and mentors)
 | `assigneeIds` | array of string | Members working on it | `["user_001"]` |
 | `submission` | object or null | The submitted work (see below) | |
 | `helpRequest` | object or null | "Ask the mentor": `userId`, `note`, `at`, `resolvedAt`, `resolvedBy` | |
+| `week` | number | Its week of the project (copied from the template) | `2` |
+| `dueDate` | string | End of that week (`YYYY-MM-DD`); team members can move it | `"2026-11-15"` |
 | `createdAt` | string | Created time | |
 
 **`submission`:**
